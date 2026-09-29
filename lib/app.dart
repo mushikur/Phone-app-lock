@@ -1,32 +1,42 @@
 import 'package:flutter/material.dart';
 
+import 'application/app_list_controller.dart';
+import 'core/theme/app_theme.dart';
+import 'domain/repositories/app_inventory_repository.dart';
 import 'presentation/screens/home_screen.dart';
 
 /// Root of the Samir Lock app.
 ///
-/// Holds nothing but theming and the initial route for now; app-lock features
-/// are introduced in later phases.
-class SamirLockApp extends StatelessWidget {
-  const SamirLockApp({super.key});
+/// Owns the single [AppListController] and hands it to the screen; the
+/// repository is injected so tests can swap in a fake native layer.
+class SamirLockApp extends StatefulWidget {
+  const SamirLockApp({super.key, required this.repository});
 
-  static const _seedColor = Color(0xFF3F51B5);
+  final AppInventoryRepository repository;
+
+  @override
+  State<SamirLockApp> createState() => _SamirLockAppState();
+}
+
+class _SamirLockAppState extends State<SamirLockApp> {
+  late final AppListController _controller =
+      AppListController(widget.repository);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Samir Lock',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _seedColor,
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: HomeScreen(controller: _controller),
     );
   }
 }

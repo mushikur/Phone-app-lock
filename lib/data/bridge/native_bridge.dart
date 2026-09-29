@@ -1,0 +1,37 @@
+import 'package:flutter/services.dart';
+
+/// Thin typed wrapper over the single MethodChannel shared with the Android layer.
+///
+/// Keeping the channel name and method names in one place means the rest of the
+/// Dart code never touches [MethodChannel] directly.
+class NativeBridge {
+  const NativeBridge([this.channel = _defaultChannel]);
+
+  static const MethodChannel _defaultChannel =
+      MethodChannel('com.samirlock.app/bridge');
+
+  final MethodChannel channel;
+
+  Future<List<Map<Object?, Object?>>> getInstalledApps() async {
+    final apps = await channel.invokeListMethod<Map<Object?, Object?>>(
+      'getInstalledApps',
+    );
+    return apps ?? const [];
+  }
+
+  Future<List<String>> getLockedPackages() async {
+    final packages = await channel.invokeListMethod<String>('getLockedPackages');
+    return packages ?? const [];
+  }
+
+  Future<bool> setAppLocked({
+    required String packageName,
+    required bool locked,
+  }) async {
+    final result = await channel.invokeMethod<bool>('setAppLocked', {
+      'packageName': packageName,
+      'locked': locked,
+    });
+    return result ?? locked;
+  }
+}
