@@ -22,6 +22,8 @@ class SecurityState {
 
   bool get canUseBiometrics => status.canUseBiometrics;
 
+  bool get biometricsActive => status.biometricsActive;
+
   SecurityState copyWith({
     SecurityLoadStatus? loadStatus,
     SecurityStatus? status,
@@ -89,6 +91,26 @@ class SecurityController extends ChangeNotifier {
       final opened = await _repository.openPinSetup();
       return opened ? null : 'Could not open the PIN screen.';
     } on SecurityException catch (error) {
+      return error.message;
+    }
+  }
+
+  /// Turns the biometric option on or off.
+  ///
+  /// Returns a message to show the user on failure, or null on success.
+  Future<String?> setBiometricEnabled(bool enabled) async {
+    try {
+      final status = await _repository.setBiometricEnabled(enabled);
+      _emit(
+        _state.copyWith(
+          loadStatus: SecurityLoadStatus.ready,
+          status: status,
+          clearError: true,
+        ),
+      );
+      return null;
+    } on SecurityException catch (error) {
+      _emit(_state.copyWith(errorMessage: error.message));
       return error.message;
     }
   }

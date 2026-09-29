@@ -23,6 +23,7 @@ import com.samirlock.app.auth.LockoutStore
 import com.samirlock.app.auth.PinPolicy
 import com.samirlock.app.auth.PinVault
 import com.samirlock.app.guard.GuardLog
+import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.LockCoordinator
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -41,6 +42,7 @@ class LockActivity : FragmentActivity() {
     private lateinit var vault: PinVault
     private lateinit var lockoutStore: LockoutStore
     private lateinit var biometrics: BiometricAuthenticator
+    private lateinit var preferences: GuardPreferences
     private lateinit var pad: PinPadController
 
     private lateinit var dots: LinearLayout
@@ -73,6 +75,7 @@ class LockActivity : FragmentActivity() {
         vault = PinVault(this)
         lockoutStore = LockoutStore(this)
         biometrics = BiometricAuthenticator(this)
+        preferences = GuardPreferences(this)
 
         dots = findViewById(R.id.lock_pin_dots)
         errorView = findViewById(R.id.lock_error)
@@ -161,7 +164,9 @@ class LockActivity : FragmentActivity() {
             return
         }
 
-        val available = biometrics.availability() == BiometricAuthenticator.Availability.AVAILABLE
+        // The user can switch biometrics off; the PIN pad is always there.
+        val available = preferences.isBiometricEnabled &&
+            biometrics.availability() == BiometricAuthenticator.Availability.AVAILABLE
         pad.setBiometricAvailable(available)
 
         applyLockout(lockoutStore.remainingLockoutMs())

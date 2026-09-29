@@ -1,79 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../../application/app_list_controller.dart';
-import '../../application/protection_controller.dart';
-import '../../application/security_controller.dart';
+import '../../core/theme/app_theme.dart';
 import '../../domain/entities/installed_app.dart';
 import '../widgets/app_list_tile.dart';
 import '../widgets/app_search_field.dart';
-import '../widgets/lock_summary_card.dart';
-import '../widgets/protection_card.dart';
-import '../widgets/security_card.dart';
 import '../widgets/state_views.dart';
 
-/// Main screen: the installed-app inventory with a lock toggle per app.
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({
-    super.key,
-    required this.controller,
-    required this.protectionController,
-    required this.securityController,
-  });
+/// The installed-app inventory, with a lock toggle for each app.
+class AppsScreen extends StatefulWidget {
+  const AppsScreen({super.key, required this.controller});
 
   final AppListController controller;
-  final ProtectionController protectionController;
-  final SecurityController securityController;
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<AppsScreen> createState() => _AppsScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _AppsScreenState extends State<AppsScreen> {
   final TextEditingController _searchController = TextEditingController();
-  late final AppLifecycleListener _lifecycleListener;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.load();
-    widget.protectionController.refresh();
-    widget.securityController.refresh();
-    // A permission revoked in Android Settings can stop the guard behind the
-    // app's back, and the PIN is created on a native screen, so both are re-read
-    // whenever the app comes forward.
-    _lifecycleListener = AppLifecycleListener(
-      onResume: () {
-        widget.protectionController.refresh(showSpinner: false);
-        widget.securityController.refresh(showSpinner: false);
-      },
-    );
-  }
 
   @override
   void dispose() {
-    _lifecycleListener.dispose();
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _onSetUpPin() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final error = await widget.securityController.openPinSetup();
-    if (error == null) return;
-
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(error)));
-  }
-
-  Future<void> _onProtectionChanged(bool enabled) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final error = await widget.protectionController.setEnabled(enabled);
-    if (error == null) return;
-
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(error)));
   }
 
   Future<void> _onToggle(InstalledApp app) async {
@@ -106,14 +56,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Samir Lock'),
+        title: const Text('Apps'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Reload apps',
             onPressed: () => widget.controller.load(),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
         ],
       ),
       body: SafeArea(
@@ -126,42 +76,24 @@ class _HomeScreenState extends State<HomeScreen> {
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                  child: LockSummaryCard(
-                    lockedCount: state.lockedCount,
-                    totalCount: state.totalCount,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.xs,
+                    AppSpacing.lg,
+                    0,
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: ListenableBuilder(
-                    listenable: widget.securityController,
-                    builder: (context, _) => SecurityCard(
-                      state: widget.securityController.state,
-                      onSetUpPin: _onSetUpPin,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: ListenableBuilder(
-                    listenable: widget.protectionController,
-                    builder: (context, _) => ProtectionCard(
-                      state: widget.protectionController.state,
-                      lockedCount: state.lockedCount,
-                      onChanged: _onProtectionChanged,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: AppSearchField(
                     controller: _searchController,
                     onChanged: widget.controller.setQuery,
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                    AppSpacing.xs,
+                  ),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: _FilterChips(
@@ -173,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
+                    duration: const Duration(milliseconds: 180),
                     child: _Body(
                       key: ValueKey(_bodyKey(state)),
                       state: state,
@@ -212,14 +144,16 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const padding = EdgeInsets.fromLTRB(16, 8, 16, 16);
+    const padding = EdgeInsets.fromLTRB(
+      AppSpacing.lg,
+      AppSpacing.sm,
+      AppSpacing.lg,
+      AppSpacing.lg,
+    );
 
     switch (state.status) {
       case AppListStatus.loading:
-        return const Padding(
-          padding: padding,
-          child: AppListLoadingView(),
-        );
+        return const Padding(padding: padding, child: AppListLoadingView());
 
       case AppListStatus.error:
         return AppListMessageView(
@@ -289,7 +223,7 @@ class _FilterChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
+      spacing: AppSpacing.sm,
       children: [
         ChoiceChip(
           label: const Text('All apps'),

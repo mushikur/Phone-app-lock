@@ -90,9 +90,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Required permissions were already satisfied on the first read, so the gate
-    // goes straight to the app list.
+    // goes straight to the dashboard rather than showing setup.
     expect(find.text('Samir Lock'), findsWidgets);
-    expect(find.text('Chat'), findsOneWidget);
+    expect(find.text('Let us set up protection'), findsNothing);
   });
 
   testWidgets('granted permissions are shown as granted', (tester) async {

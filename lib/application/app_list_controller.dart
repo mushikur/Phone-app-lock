@@ -38,6 +38,10 @@ class AppListState {
 
   int get lockedCount => lockedPackages.length;
 
+  /// The locked apps, in the same order as the inventory.
+  List<InstalledApp> get lockedApps =>
+      apps.where(isLocked).toList(growable: false);
+
   int get totalCount => apps.length;
 
   bool isLocked(InstalledApp app) => lockedPackages.contains(app.packageName);

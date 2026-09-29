@@ -8,6 +8,8 @@ import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import com.samirlock.app.auth.BiometricAuthenticator
+import com.samirlock.app.auth.LockoutPolicy
+import com.samirlock.app.auth.LockoutStore
 import com.samirlock.app.auth.PinVault
 import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.lock.PinSetupActivity
@@ -45,6 +47,7 @@ class SamirLockBridge(
     private val settingsLauncher = PermissionSettingsLauncher(context)
     private val guardPreferences = GuardPreferences(context)
     private val pinVault = PinVault(context)
+    private val lockoutStore = LockoutStore(context)
     private val appContext = context.applicationContext
     private val channel = MethodChannel(messenger, CHANNEL_NAME)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -121,6 +124,21 @@ class SamirLockBridge(
             METHOD_GET_PROTECTION_STATUS -> result.success(protectionStatus())
 
             METHOD_GET_SECURITY_STATUS -> result.success(securityStatus())
+
+            METHOD_SET_BIOMETRIC_ENABLED -> {
+                val enabled = call.argument<Boolean>(ARG_ENABLED)
+                if (enabled == null) {
+                    result.error(
+                        ERROR_INVALID_ARGUMENTS,
+                        "setBiometricEnabled requires an enabled flag.",
+                        null,
+                    )
+                    return
+                }
+                guardPreferences.isBiometricEnabled = enabled
+                GuardLog.d("bridge: setBiometricEnabled($enabled)")
+                result.success(securityStatus())
+            }
 
             METHOD_OPEN_PIN_SETUP -> {
                 val host = activity
@@ -257,6 +275,11 @@ class SamirLockBridge(
     private fun securityStatus(): Map<String, Any?> = mapOf(
         KEY_HAS_PIN to pinVault.hasPin(),
         KEY_BIOMETRIC to BiometricAuthenticator.availabilityOf(appContext).name,
+        KEY_BIOMETRIC_ENABLED to guardPreferences.isBiometricEnabled,
+        // Enough to describe the lockout to the user, and nothing that could help
+        // anyone past it.
+        KEY_FREE_ATTEMPTS to LockoutPolicy.FREE_ATTEMPTS,
+        KEY_FAILED_ATTEMPTS to lockoutStore.failedAttempts,
     )
 
     private fun setProtectionEnabled(enabled: Boolean): Map<String, Any?> {
@@ -309,6 +332,7 @@ class SamirLockBridge(
         const val METHOD_SET_PROTECTION_ENABLED = "setProtectionEnabled"
         const val METHOD_GET_SECURITY_STATUS = "getSecurityStatus"
         const val METHOD_OPEN_PIN_SETUP = "openPinSetup"
+        const val METHOD_SET_BIOMETRIC_ENABLED = "setBiometricEnabled"
 
         const val ARG_PACKAGE_NAME = "packageName"
         const val ARG_LOCKED = "locked"
@@ -320,6 +344,9 @@ class SamirLockBridge(
         const val KEY_CAN_RUN = "canRun"
         const val KEY_HAS_PIN = "hasPin"
         const val KEY_BIOMETRIC = "biometric"
+        const val KEY_BIOMETRIC_ENABLED = "biometricEnabled"
+        const val KEY_FREE_ATTEMPTS = "freeAttempts"
+        const val KEY_FAILED_ATTEMPTS = "failedAttempts"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"

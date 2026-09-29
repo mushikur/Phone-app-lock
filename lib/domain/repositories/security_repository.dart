@@ -25,16 +25,38 @@ class SecurityStatus {
   const SecurityStatus({
     required this.hasPin,
     required this.biometric,
+    required this.isBiometricEnabled,
+    required this.freeAttempts,
+    required this.failedAttempts,
   });
 
   const SecurityStatus.unknown()
       : hasPin = false,
-        biometric = BiometricAvailability.unavailable;
+        biometric = BiometricAvailability.unavailable,
+        isBiometricEnabled = true,
+        freeAttempts = 0,
+        failedAttempts = 0;
 
   final bool hasPin;
   final BiometricAvailability biometric;
 
+  /// Whether the user wants the lock screen to offer biometrics.
+  ///
+  /// A preference only: the PIN is required either way, and the lock screen
+  /// reads this natively rather than being told what to do from here.
+  final bool isBiometricEnabled;
+
+  /// Wrong PIN attempts allowed before delays begin.
+  final int freeAttempts;
+
+  /// Consecutive wrong attempts recorded so far.
+  final int failedAttempts;
+
+  /// The device can do biometrics right now.
   bool get canUseBiometrics => biometric == BiometricAvailability.available;
+
+  /// Biometrics are possible and the user has them switched on.
+  bool get biometricsActive => canUseBiometrics && isBiometricEnabled;
 }
 
 /// Reads authentication status and opens the native PIN setup screen.
@@ -46,6 +68,9 @@ abstract interface class SecurityRepository {
   /// The PIN is typed there and handed straight to Keystore-backed storage; it
   /// never passes through Dart. Returns false if the screen could not be opened.
   Future<bool> openPinSetup();
+
+  /// Turns the biometric option on or off, returning the resulting status.
+  Future<SecurityStatus> setBiometricEnabled(bool enabled);
 }
 
 /// Raised when the native layer cannot satisfy a security request.

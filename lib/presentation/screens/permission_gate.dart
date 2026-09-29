@@ -4,7 +4,7 @@ import '../../application/app_list_controller.dart';
 import '../../application/permissions_controller.dart';
 import '../../application/protection_controller.dart';
 import '../../application/security_controller.dart';
-import 'home_screen.dart';
+import 'main_shell.dart';
 import 'permissions_screen.dart';
 
 /// Decides whether to show onboarding or the app list.
@@ -67,11 +67,12 @@ class _PermissionGateState extends State<PermissionGate> {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 260),
       child: _showHome
-          ? HomeScreen(
+          ? MainShell(
               key: const ValueKey('home'),
-              controller: widget.appListController,
+              appListController: widget.appListController,
               protectionController: widget.protectionController,
               securityController: widget.securityController,
+              permissionsController: widget.permissionsController,
             )
           : PermissionsScreen(
               key: const ValueKey('permissions'),
