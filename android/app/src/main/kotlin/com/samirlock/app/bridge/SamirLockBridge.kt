@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import com.samirlock.app.data.LockedAppsStore
+import com.samirlock.app.guard.GuardPreferences
+import com.samirlock.app.guard.GuardServiceController
 import com.samirlock.app.inventory.InstalledAppsProvider
 import com.samirlock.app.permissions.PermissionChecker
 import com.samirlock.app.permissions.PermissionIds
@@ -36,6 +38,8 @@ class SamirLockBridge(
     private val lockedAppsStore = LockedAppsStore(context)
     private val permissionChecker = PermissionChecker(context)
     private val settingsLauncher = PermissionSettingsLauncher(context)
+    private val guardPreferences = GuardPreferences(context)
+    private val appContext = context.applicationContext
     private val channel = MethodChannel(messenger, CHANNEL_NAME)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var executor: ExecutorService? = null
@@ -96,6 +100,21 @@ class SamirLockBridge(
             }
 
             METHOD_REQUEST_NOTIFICATION_PERMISSION -> requestNotificationPermission(result)
+
+            METHOD_GET_PROTECTION_STATUS -> result.success(protectionStatus())
+
+            METHOD_SET_PROTECTION_ENABLED -> {
+                val enabled = call.argument<Boolean>(ARG_ENABLED)
+                if (enabled == null) {
+                    result.error(
+                        ERROR_INVALID_ARGUMENTS,
+                        "setProtectionEnabled requires an enabled flag.",
+                        null,
+                    )
+                    return
+                }
+                result.success(setProtectionEnabled(enabled))
+            }
 
             else -> result.notImplemented()
         }
@@ -167,6 +186,35 @@ class SamirLockBridge(
         return true
     }
 
+    /**
+     * Whether protection is switched on, whether the service is actually up, and
+     * whether the permissions it needs are in place.
+     */
+    private fun protectionStatus(): Map<String, Any?> = mapOf(
+        KEY_ENABLED to guardPreferences.isProtectionEnabled,
+        KEY_RUNNING to GuardServiceController.isRunning(),
+        KEY_CAN_RUN to GuardServiceController.canRun(appContext),
+    )
+
+    /**
+     * Starts or stops the guard and remembers the choice.
+     *
+     * Enabling fails silently-but-visibly when the required permissions are
+     * missing: the returned status simply still says disabled, and the UI reports
+     * what is missing rather than showing protection as on when it is not.
+     */
+    private fun setProtectionEnabled(enabled: Boolean): Map<String, Any?> {
+        if (!enabled) {
+            GuardServiceController.stop(appContext)
+            guardPreferences.isProtectionEnabled = false
+            return protectionStatus()
+        }
+
+        val started = GuardServiceController.start(appContext)
+        guardPreferences.isProtectionEnabled = started
+        return protectionStatus()
+    }
+
     private fun runInBackground(result: MethodChannel.Result, work: () -> Any?) {
         val runner = executor
         if (runner == null || runner.isShutdown) {
@@ -192,10 +240,17 @@ class SamirLockBridge(
         const val METHOD_GET_PERMISSION_STATUSES = "getPermissionStatuses"
         const val METHOD_OPEN_PERMISSION_SETTINGS = "openPermissionSettings"
         const val METHOD_REQUEST_NOTIFICATION_PERMISSION = "requestNotificationPermission"
+        const val METHOD_GET_PROTECTION_STATUS = "getProtectionStatus"
+        const val METHOD_SET_PROTECTION_ENABLED = "setProtectionEnabled"
 
         const val ARG_PACKAGE_NAME = "packageName"
         const val ARG_LOCKED = "locked"
         const val ARG_PERMISSION = "permission"
+        const val ARG_ENABLED = "enabled"
+
+        const val KEY_ENABLED = "enabled"
+        const val KEY_RUNNING = "running"
+        const val KEY_CAN_RUN = "canRun"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"

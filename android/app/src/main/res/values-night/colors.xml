@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lock screen palette, dark mode. -->
+    <color name="lock_background">#FF101014</color>
+    <color name="lock_surface">#FF1A1A20</color>
+    <color name="lock_text_primary">#FFF2F2F6</color>
+    <color name="lock_text_secondary">#FFA8AAB8</color>
+    <color name="lock_accent">#FFAEB6FF</color>
+    <color name="lock_accent_soft">#33AEB6FF</color>
+    <color name="lock_on_accent">#FF1B1B1F</color>
+</resources>

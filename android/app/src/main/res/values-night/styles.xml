@@ -15,4 +15,12 @@
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+    <!-- Lock screen, dark mode. -->
+    <style name="LockTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/lock_background</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:statusBarColor">@color/lock_background</item>
+        <item name="android:navigationBarColor">@color/lock_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

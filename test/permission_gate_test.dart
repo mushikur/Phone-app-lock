@@ -5,6 +5,7 @@ import 'package:samir_lock/domain/entities/app_permission.dart';
 
 import 'fakes/fake_app_inventory_repository.dart';
 import 'fakes/fake_permission_repository.dart';
+import 'fakes/fake_protection_repository.dart';
 
 void main() {
   /// The four permission tiles do not fit the default 800px test viewport, and a
@@ -24,6 +25,7 @@ void main() {
     return SamirLockApp(
       inventoryRepository: inventory ?? FakeAppInventoryRepository(),
       permissionRepository: permissions,
+      protectionRepository: FakeProtectionRepository(),
     );
   }
 

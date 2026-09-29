@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../../application/app_list_controller.dart';
+import '../../application/protection_controller.dart';
 import '../../domain/entities/installed_app.dart';
 import '../widgets/app_list_tile.dart';
 import '../widgets/app_search_field.dart';
 import '../widgets/lock_summary_card.dart';
+import '../widgets/protection_card.dart';
 import '../widgets/state_views.dart';
 
 /// Main screen: the installed-app inventory with a lock toggle per app.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.controller});
+  const HomeScreen({
+    super.key,
+    required this.controller,
+    required this.protectionController,
+  });
 
   final AppListController controller;
+  final ProtectionController protectionController;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,17 +26,35 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
+  late final AppLifecycleListener _lifecycleListener;
 
   @override
   void initState() {
     super.initState();
     widget.controller.load();
+    widget.protectionController.refresh();
+    // A permission revoked in Android Settings can stop the guard behind the
+    // app's back, so the status is re-read whenever the app comes forward.
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () => widget.protectionController.refresh(showSpinner: false),
+    );
   }
 
   @override
   void dispose() {
+    _lifecycleListener.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _onProtectionChanged(bool enabled) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await widget.protectionController.setEnabled(enabled);
+    if (error == null) return;
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error)));
   }
 
   Future<void> _onToggle(InstalledApp app) async {
@@ -82,10 +107,21 @@ class _HomeScreenState extends State<HomeScreen> {
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
                   child: LockSummaryCard(
                     lockedCount: state.lockedCount,
                     totalCount: state.totalCount,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: ListenableBuilder(
+                    listenable: widget.protectionController,
+                    builder: (context, _) => ProtectionCard(
+                      state: widget.protectionController.state,
+                      lockedCount: state.lockedCount,
+                      onChanged: _onProtectionChanged,
+                    ),
                   ),
                 ),
                 Padding(

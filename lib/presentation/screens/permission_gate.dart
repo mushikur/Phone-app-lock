@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../application/app_list_controller.dart';
 import '../../application/permissions_controller.dart';
+import '../../application/protection_controller.dart';
 import 'home_screen.dart';
 import 'permissions_screen.dart';
 
@@ -18,10 +19,12 @@ class PermissionGate extends StatefulWidget {
     super.key,
     required this.permissionsController,
     required this.appListController,
+    required this.protectionController,
   });
 
   final PermissionsController permissionsController;
   final AppListController appListController;
+  final ProtectionController protectionController;
 
   @override
   State<PermissionGate> createState() => _PermissionGateState();
@@ -64,6 +67,7 @@ class _PermissionGateState extends State<PermissionGate> {
           ? HomeScreen(
               key: const ValueKey('home'),
               controller: widget.appListController,
+              protectionController: widget.protectionController,
             )
           : PermissionsScreen(
               key: const ValueKey('permissions'),

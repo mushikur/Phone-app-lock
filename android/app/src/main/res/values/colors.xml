@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lock screen palette, light mode. Kept as explicit colours rather than
+         theme attributes so the screen renders identically on every OEM ROM. -->
+    <color name="lock_background">#FFF7F7FB</color>
+    <color name="lock_surface">#FFFFFFFF</color>
+    <color name="lock_text_primary">#FF1B1B1F</color>
+    <color name="lock_text_secondary">#FF5A5C6B</color>
+    <color name="lock_accent">#FF4C5BD4</color>
+    <color name="lock_accent_soft">#1F4C5BD4</color>
+    <color name="lock_on_accent">#FFFFFFFF</color>
+</resources>

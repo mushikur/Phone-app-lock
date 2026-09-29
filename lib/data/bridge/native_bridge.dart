@@ -52,4 +52,19 @@ class NativeBridge {
   Future<String?> requestNotificationPermission() {
     return channel.invokeMethod<String>('requestNotificationPermission');
   }
+
+  Future<Map<String, Object?>> getProtectionStatus() async {
+    final status = await channel.invokeMapMethod<String, Object?>(
+      'getProtectionStatus',
+    );
+    return status ?? const {};
+  }
+
+  Future<Map<String, Object?>> setProtectionEnabled(bool enabled) async {
+    final status = await channel.invokeMapMethod<String, Object?>(
+      'setProtectionEnabled',
+      {'enabled': enabled},
+    );
+    return status ?? const {};
+  }
 }

@@ -15,4 +15,14 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+    <!-- Lock screen. A plain platform theme (the project has no AppCompat) with
+         the window background pre-set so the screen paints instantly instead of
+         flashing white, and no window animation so it appears immediately. -->
+    <style name="LockTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/lock_background</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:statusBarColor">@color/lock_background</item>
+        <item name="android:navigationBarColor">@color/lock_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Lock screen layout.
+
+  Framework views only: the project carries no AppCompat or Material dependency,
+  and a flat hierarchy is part of what keeps this screen fast to inflate.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/lock_background"
+    android:orientation="vertical"
+    android:paddingStart="28dp"
+    android:paddingTop="32dp"
+    android:paddingEnd="28dp"
+    android:paddingBottom="28dp">
+
+    <!-- Branding -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/lock_badge_background"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingTop="7dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="7dp">
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_guard_shield"
+            android:tint="@color/lock_accent" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.14"
+            android:text="@string/brand_name"
+            android:textColor="@color/lock_accent"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Locked app -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:background="@drawable/lock_icon_backdrop">
+
+            <ImageView
+                android:id="@+id/lock_app_icon"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/lock_app_icon_description" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/lock_app_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="@color/lock_text_secondary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:fontFamily="sans-serif"
+            android:gravity="center"
+            android:text="@string/lock_headline"
+            android:textColor="@color/lock_text_primary"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:text="@string/lock_subtitle"
+            android:textColor="@color/lock_text_secondary"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+    <!-- Temporary unlock, for testing the lock engine only -->
+    <Button
+        android:id="@+id/lock_unlock_button"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@drawable/lock_unlock_button"
+        android:fontFamily="sans-serif-medium"
+        android:stateListAnimator="@null"
+        android:text="@string/lock_unlock_action"
+        android:textAllCaps="false"
+        android:textColor="@color/lock_on_accent"
+        android:textSize="16sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:gravity="center"
+        android:text="@string/lock_test_notice"
+        android:textColor="@color/lock_text_secondary"
+        android:textSize="12sp" />
+</LinearLayout>

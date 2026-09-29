@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="brand_name">SAMIR LOCK</string>
+
+    <string name="lock_headline">App locked</string>
+    <string name="lock_subtitle">Unlock to continue.</string>
+    <string name="lock_unlock_action">Unlock</string>
+    <string name="lock_test_notice">Temporary test unlock. PIN and fingerprint arrive in the next phase.</string>
+    <string name="lock_app_icon_description">Icon of the locked app</string>
+
+    <string name="guard_channel_name">Protection</string>
+    <string name="guard_channel_description">Shows while Samir Lock is watching for locked apps.</string>
+    <string name="guard_notification_title">Protection is on</string>
+    <string name="guard_notification_text">Your locked apps are being watched.</string>
+</resources>

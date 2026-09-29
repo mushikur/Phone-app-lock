@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'application/app_list_controller.dart';
 import 'application/permissions_controller.dart';
+import 'application/protection_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'domain/repositories/app_inventory_repository.dart';
 import 'domain/repositories/permission_repository.dart';
+import 'domain/repositories/protection_repository.dart';
 import 'presentation/screens/permission_gate.dart';
 
 /// Root of the Samir Lock app.
@@ -16,10 +18,12 @@ class SamirLockApp extends StatefulWidget {
     super.key,
     required this.inventoryRepository,
     required this.permissionRepository,
+    required this.protectionRepository,
   });
 
   final AppInventoryRepository inventoryRepository;
   final PermissionRepository permissionRepository;
+  final ProtectionRepository protectionRepository;
 
   @override
   State<SamirLockApp> createState() => _SamirLockAppState();
@@ -30,11 +34,14 @@ class _SamirLockAppState extends State<SamirLockApp> {
       AppListController(widget.inventoryRepository);
   late final PermissionsController _permissionsController =
       PermissionsController(widget.permissionRepository);
+  late final ProtectionController _protectionController =
+      ProtectionController(widget.protectionRepository);
 
   @override
   void dispose() {
     _appListController.dispose();
     _permissionsController.dispose();
+    _protectionController.dispose();
     super.dispose();
   }
 
@@ -49,6 +56,7 @@ class _SamirLockAppState extends State<SamirLockApp> {
       home: PermissionGate(
         permissionsController: _permissionsController,
         appListController: _appListController,
+        protectionController: _protectionController,
       ),
     );
   }
