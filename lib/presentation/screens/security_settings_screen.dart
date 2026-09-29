@@ -25,6 +25,8 @@ class SecuritySettingsScreen extends StatelessWidget {
 
   static const Key biometricSwitchKey = Key('biometric-switch');
   static const Key changePinKey = Key('change-pin-tile');
+  static const Key notificationPrivacyKey = Key('notification-privacy-switch');
+  static const Key notificationAccessKey = Key('notification-access-tile');
 
   Future<void> _setUpPin(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -39,6 +41,26 @@ class SecuritySettingsScreen extends StatelessWidget {
   Future<void> _setBiometric(BuildContext context, bool enabled) async {
     final messenger = ScaffoldMessenger.of(context);
     final error = await securityController.setBiometricEnabled(enabled);
+    if (error == null) return;
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error)));
+  }
+
+  Future<void> _setNotificationPrivacy(BuildContext context, bool enabled) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await securityController.setNotificationPrivacyEnabled(enabled);
+    if (error == null) return;
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error)));
+  }
+
+  Future<void> _openNotificationAccess(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await securityController.openNotificationAccess();
     if (error == null) return;
 
     messenger
@@ -150,6 +172,49 @@ class SecuritySettingsScreen extends StatelessWidget {
                       subtitle: 'As soon as you leave the app, and whenever the '
                           'screen turns off.',
                     ),
+                  ],
+                );
+              },
+            ),
+            const SectionHeader('Privacy'),
+            ListenableBuilder(
+              listenable: securityController,
+              builder: (context, _) {
+                final status = securityController.state.status;
+                final granted = status.isNotificationAccessGranted;
+
+                return SettingsGroup(
+                  children: [
+                    SettingsTile(
+                      icon: status.isNotificationPrivacyEnabled
+                          ? Icons.notifications_off
+                          : Icons.notifications_none,
+                      title: 'Hide notification content',
+                      subtitle: granted
+                          ? 'Notifications from locked apps show only the app '
+                              'name until you unlock them.'
+                          : 'Needs notification access before it can work.',
+                      isEnabled: granted,
+                      trailing: Semantics(
+                        label: 'Hide notification content',
+                        child: Switch(
+                          key: notificationPrivacyKey,
+                          value: status.isNotificationPrivacyEnabled,
+                          onChanged: granted
+                              ? (value) => _setNotificationPrivacy(context, value)
+                              : null,
+                        ),
+                      ),
+                    ),
+                    if (!granted)
+                      SettingsTile(
+                        key: notificationAccessKey,
+                        icon: Icons.open_in_new,
+                        title: 'Grant notification access',
+                        subtitle: 'Opens Android settings. Samir Lock reads which '
+                            'app a notification came from, never what it says.',
+                        onTap: () => _openNotificationAccess(context),
+                      ),
                   ],
                 );
               },

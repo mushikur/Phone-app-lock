@@ -13,6 +13,7 @@ import com.samirlock.app.auth.LockoutStore
 import com.samirlock.app.auth.PinVault
 import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.lock.PinSetupActivity
+import com.samirlock.app.notifications.NotificationPrivacy
 import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.GuardServiceController
@@ -124,6 +125,33 @@ class SamirLockBridge(
             METHOD_GET_PROTECTION_STATUS -> result.success(protectionStatus())
 
             METHOD_GET_SECURITY_STATUS -> result.success(securityStatus())
+
+            METHOD_SET_NOTIFICATION_PRIVACY -> {
+                val enabled = call.argument<Boolean>(ARG_ENABLED)
+                if (enabled == null) {
+                    result.error(
+                        ERROR_INVALID_ARGUMENTS,
+                        "setNotificationPrivacyEnabled requires an enabled flag.",
+                        null,
+                    )
+                    return
+                }
+                // Turning it on without notification access would silently do
+                // nothing, so the preference only sticks when it can work.
+                val granted = NotificationPrivacy.hasAccess(appContext)
+                guardPreferences.isNotificationPrivacyEnabled = enabled && granted
+                GuardLog.d("bridge: setNotificationPrivacyEnabled($enabled) access=$granted")
+                result.success(securityStatus())
+            }
+
+            METHOD_OPEN_NOTIFICATION_ACCESS -> {
+                val host = activity
+                val opened = NotificationPrivacy.openAccessSettings(
+                    context = host ?: appContext,
+                    fromActivity = host != null,
+                )
+                result.success(opened)
+            }
 
             METHOD_SET_BIOMETRIC_ENABLED -> {
                 val enabled = call.argument<Boolean>(ARG_ENABLED)
@@ -280,6 +308,8 @@ class SamirLockBridge(
         // anyone past it.
         KEY_FREE_ATTEMPTS to LockoutPolicy.FREE_ATTEMPTS,
         KEY_FAILED_ATTEMPTS to lockoutStore.failedAttempts,
+        KEY_NOTIFICATION_PRIVACY to guardPreferences.isNotificationPrivacyEnabled,
+        KEY_NOTIFICATION_ACCESS to NotificationPrivacy.hasAccess(appContext),
     )
 
     private fun setProtectionEnabled(enabled: Boolean): Map<String, Any?> {
@@ -333,6 +363,8 @@ class SamirLockBridge(
         const val METHOD_GET_SECURITY_STATUS = "getSecurityStatus"
         const val METHOD_OPEN_PIN_SETUP = "openPinSetup"
         const val METHOD_SET_BIOMETRIC_ENABLED = "setBiometricEnabled"
+        const val METHOD_SET_NOTIFICATION_PRIVACY = "setNotificationPrivacyEnabled"
+        const val METHOD_OPEN_NOTIFICATION_ACCESS = "openNotificationAccess"
 
         const val ARG_PACKAGE_NAME = "packageName"
         const val ARG_LOCKED = "locked"
@@ -347,6 +379,8 @@ class SamirLockBridge(
         const val KEY_BIOMETRIC_ENABLED = "biometricEnabled"
         const val KEY_FREE_ATTEMPTS = "freeAttempts"
         const val KEY_FAILED_ATTEMPTS = "failedAttempts"
+        const val KEY_NOTIFICATION_PRIVACY = "notificationPrivacyEnabled"
+        const val KEY_NOTIFICATION_ACCESS = "notificationAccessGranted"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"

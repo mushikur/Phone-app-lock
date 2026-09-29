@@ -96,6 +96,15 @@ object LockCoordinator {
         return Decision.ShowLock(packageName)
     }
 
+    /**
+     * Whether the user has unlocked [packageName] and not yet left it.
+     *
+     * Read by notification privacy, which leaves an app's notifications alone
+     * while the user is actually looking at that app.
+     */
+    @Synchronized
+    fun isUnlocked(packageName: String): Boolean = packageName in unlockedPackages
+
     /** The lock screen is now on screen for [packageName]. */
     @Synchronized
     fun onLockShown(packageName: String) {

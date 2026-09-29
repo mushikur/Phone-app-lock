@@ -33,10 +33,12 @@ abstract final class AppTheme {
     final base = ThemeData(colorScheme: colorScheme);
 
     return base.copyWith(
-      scaffoldBackgroundColor: colorScheme.surface,
+      // Transparent so the shared AppBackground wash shows through every
+      // screen; the background widget owns the colour.
+      scaffoldBackgroundColor: Colors.transparent,
       textTheme: _textTheme(base.textTheme),
       appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
         elevation: 0,
@@ -56,7 +58,10 @@ abstract final class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: Color.alphaBlend(
+          colorScheme.primary.withValues(alpha: 0.05),
+          colorScheme.surface,
+        ),
         surfaceTintColor: Colors.transparent,
         indicatorColor: colorScheme.secondaryContainer,
         elevation: 0,

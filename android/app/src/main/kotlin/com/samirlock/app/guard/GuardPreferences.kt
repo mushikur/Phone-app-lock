@@ -29,9 +29,21 @@ class GuardPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, value).apply()
 
+    /**
+     * Whether notifications from locked apps are hidden while they are locked.
+     *
+     * Off by default: it needs a separate Android permission and it replaces
+     * notifications rather than merely dimming them, so it is the user's choice
+     * to make.
+     */
+    var isNotificationPrivacyEnabled: Boolean
+        get() = prefs.getBoolean(KEY_NOTIFICATION_PRIVACY, false)
+        set(value) = prefs.edit().putBoolean(KEY_NOTIFICATION_PRIVACY, value).apply()
+
     private companion object {
         const val PREFS_NAME = "samir_lock_preferences"
         const val KEY_PROTECTION_ENABLED = "protection_enabled"
         const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
+        const val KEY_NOTIFICATION_PRIVACY = "notification_privacy_enabled"
     }
 }

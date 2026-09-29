@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name_label">Samir Lock</string>
     <string name="brand_name">SAMIR LOCK</string>
 
     <string name="lock_headline">App locked</string>
@@ -38,4 +39,9 @@
     <string name="pin_setup_too_short">Use at least 4 digits.</string>
     <string name="pin_setup_failed">Could not save your PIN. Please try again.</string>
     <string name="pin_setup_saved">PIN saved</string>
+
+    <string name="privacy_channel_name">Hidden notifications</string>
+    <string name="privacy_channel_description">Stands in for notifications from your locked apps.</string>
+    <string name="privacy_hidden_one">New notification. Unlock to view.</string>
+    <string name="privacy_hidden_many">%1$d new notifications. Unlock to view.</string>
 </resources>

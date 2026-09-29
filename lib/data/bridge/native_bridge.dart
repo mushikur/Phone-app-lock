@@ -81,6 +81,19 @@ class NativeBridge {
     return status ?? const {};
   }
 
+  Future<Map<String, Object?>> setNotificationPrivacyEnabled(bool enabled) async {
+    final status = await channel.invokeMapMethod<String, Object?>(
+      'setNotificationPrivacyEnabled',
+      {'enabled': enabled},
+    );
+    return status ?? const {};
+  }
+
+  Future<bool> openNotificationAccess() async {
+    final opened = await channel.invokeMethod<bool>('openNotificationAccess');
+    return opened ?? false;
+  }
+
   Future<Map<String, Object?>> setProtectionEnabled(bool enabled) async {
     final status = await channel.invokeMapMethod<String, Object?>(
       'setProtectionEnabled',

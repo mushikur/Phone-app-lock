@@ -4,6 +4,7 @@ import '../../application/app_list_controller.dart';
 import '../../application/permissions_controller.dart';
 import '../../application/protection_controller.dart';
 import '../../application/security_controller.dart';
+import '../widgets/app_background.dart';
 import 'apps_screen.dart';
 import 'dashboard_screen.dart';
 import 'permissions_screen.dart';
@@ -117,27 +118,29 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: [
-          DashboardScreen(
-            appListController: widget.appListController,
-            protectionController: widget.protectionController,
-            securityController: widget.securityController,
-            permissionsController: widget.permissionsController,
-            onManageApps: () => _goToTab(1),
-            onOpenSecurity: () => _goToTab(2),
-            onOpenPermissions: _openPermissions,
-            onProtectionChanged: _onProtectionChanged,
-          ),
-          AppsScreen(controller: widget.appListController),
-          SecuritySettingsScreen(
-            securityController: widget.securityController,
-            protectionController: widget.protectionController,
-            permissionsController: widget.permissionsController,
-            onOpenPermissions: _openPermissions,
-          ),
-        ],
+      body: AppBackground(
+        child: IndexedStack(
+          index: _index,
+          children: [
+            DashboardScreen(
+              appListController: widget.appListController,
+              protectionController: widget.protectionController,
+              securityController: widget.securityController,
+              permissionsController: widget.permissionsController,
+              onManageApps: () => _goToTab(1),
+              onOpenSecurity: () => _goToTab(2),
+              onOpenPermissions: _openPermissions,
+              onProtectionChanged: _onProtectionChanged,
+            ),
+            AppsScreen(controller: widget.appListController),
+            SecuritySettingsScreen(
+              securityController: widget.securityController,
+              protectionController: widget.protectionController,
+              permissionsController: widget.permissionsController,
+              onOpenPermissions: _openPermissions,
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

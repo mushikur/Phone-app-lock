@@ -28,6 +28,8 @@ class SecurityStatus {
     required this.isBiometricEnabled,
     required this.freeAttempts,
     required this.failedAttempts,
+    required this.isNotificationPrivacyEnabled,
+    required this.isNotificationAccessGranted,
   });
 
   const SecurityStatus.unknown()
@@ -35,7 +37,9 @@ class SecurityStatus {
         biometric = BiometricAvailability.unavailable,
         isBiometricEnabled = true,
         freeAttempts = 0,
-        failedAttempts = 0;
+        failedAttempts = 0,
+        isNotificationPrivacyEnabled = false,
+        isNotificationAccessGranted = false;
 
   final bool hasPin;
   final BiometricAvailability biometric;
@@ -51,6 +55,13 @@ class SecurityStatus {
 
   /// Consecutive wrong attempts recorded so far.
   final int failedAttempts;
+
+  /// Notifications from locked apps are hidden while those apps are locked.
+  final bool isNotificationPrivacyEnabled;
+
+  /// Android notification access has been granted, without which hiding
+  /// notifications is impossible.
+  final bool isNotificationAccessGranted;
 
   /// The device can do biometrics right now.
   bool get canUseBiometrics => biometric == BiometricAvailability.available;
@@ -71,6 +82,15 @@ abstract interface class SecurityRepository {
 
   /// Turns the biometric option on or off, returning the resulting status.
   Future<SecurityStatus> setBiometricEnabled(bool enabled);
+
+  /// Turns notification hiding on or off, returning the resulting status.
+  ///
+  /// Turning it on only takes effect once notification access is granted; the
+  /// returned status says whether it did.
+  Future<SecurityStatus> setNotificationPrivacyEnabled(bool enabled);
+
+  /// Opens the Android screen where notification access is granted.
+  Future<bool> openNotificationAccess();
 }
 
 /// Raised when the native layer cannot satisfy a security request.

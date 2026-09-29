@@ -64,6 +64,31 @@ void main() {
       expect(repository.pinSetupRequests, 1);
     });
 
+    test('notification hiding does not stick without access', () async {
+      final repository = FakeSecurityRepository(
+        isNotificationAccessGranted: false,
+      );
+      final controller = SecurityController(repository);
+      await controller.refresh();
+
+      final error = await controller.setNotificationPrivacyEnabled(true);
+
+      expect(error, isNotNull);
+      expect(error, contains('notification access'));
+      expect(controller.state.status.isNotificationPrivacyEnabled, isFalse);
+    });
+
+    test('notification hiding turns on when access is granted', () async {
+      final repository = FakeSecurityRepository();
+      final controller = SecurityController(repository);
+      await controller.refresh();
+
+      final error = await controller.setNotificationPrivacyEnabled(true);
+
+      expect(error, isNull);
+      expect(controller.state.status.isNotificationPrivacyEnabled, isTrue);
+    });
+
     test('reports when the PIN screen could not be opened', () async {
       final controller = SecurityController(
         FakeSecurityRepository(pinSetupOpens: false),

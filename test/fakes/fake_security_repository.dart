@@ -10,6 +10,8 @@ class FakeSecurityRepository implements SecurityRepository {
     this.biometric = BiometricAvailability.available,
     this.isBiometricEnabled = true,
     this.failedAttempts = 0,
+    this.isNotificationPrivacyEnabled = false,
+    this.isNotificationAccessGranted = true,
     this.failOnLoad = false,
     this.pinSetupOpens = true,
     this.failOnWrite = false,
@@ -19,6 +21,8 @@ class FakeSecurityRepository implements SecurityRepository {
   BiometricAvailability biometric;
   bool isBiometricEnabled;
   int failedAttempts;
+  bool isNotificationPrivacyEnabled;
+  bool isNotificationAccessGranted;
   final bool failOnLoad;
   final bool pinSetupOpens;
   final bool failOnWrite;
@@ -27,6 +31,11 @@ class FakeSecurityRepository implements SecurityRepository {
 
   /// Every requested biometric preference change, in order.
   final List<bool> biometricCalls = [];
+
+  /// Every requested notification privacy change, in order.
+  final List<bool> notificationPrivacyCalls = [];
+
+  int notificationAccessRequests = 0;
 
   @override
   Future<SecurityStatus> loadStatus() async {
@@ -46,12 +55,31 @@ class FakeSecurityRepository implements SecurityRepository {
     return _status();
   }
 
+  @override
+  Future<SecurityStatus> setNotificationPrivacyEnabled(bool enabled) async {
+    notificationPrivacyCalls.add(enabled);
+    if (failOnWrite) {
+      throw const SecurityException('Could not change notification privacy.');
+    }
+    // Mirrors the native side: turning it on only sticks with access granted.
+    isNotificationPrivacyEnabled = enabled && isNotificationAccessGranted;
+    return _status();
+  }
+
+  @override
+  Future<bool> openNotificationAccess() async {
+    notificationAccessRequests++;
+    return true;
+  }
+
   SecurityStatus _status() => SecurityStatus(
         hasPin: hasPin,
         biometric: biometric,
         isBiometricEnabled: isBiometricEnabled,
         freeAttempts: 4,
         failedAttempts: failedAttempts,
+        isNotificationPrivacyEnabled: isNotificationPrivacyEnabled,
+        isNotificationAccessGranted: isNotificationAccessGranted,
       );
 
   @override

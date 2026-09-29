@@ -115,6 +115,42 @@ class SecurityController extends ChangeNotifier {
     }
   }
 
+  /// Turns notification hiding on or off.
+  ///
+  /// Returns a message to show the user when it could not take effect, or null
+  /// on success.
+  Future<String?> setNotificationPrivacyEnabled(bool enabled) async {
+    try {
+      final status = await _repository.setNotificationPrivacyEnabled(enabled);
+      _emit(
+        _state.copyWith(
+          loadStatus: SecurityLoadStatus.ready,
+          status: status,
+          clearError: true,
+        ),
+      );
+
+      if (enabled && !status.isNotificationPrivacyEnabled) {
+        return 'Samir Lock needs notification access before it can hide '
+            'notifications.';
+      }
+      return null;
+    } on SecurityException catch (error) {
+      _emit(_state.copyWith(errorMessage: error.message));
+      return error.message;
+    }
+  }
+
+  /// Opens the Android screen where notification access is granted.
+  Future<String?> openNotificationAccess() async {
+    try {
+      final opened = await _repository.openNotificationAccess();
+      return opened ? null : 'Could not open notification access settings.';
+    } on SecurityException catch (error) {
+      return error.message;
+    }
+  }
+
   void _emit(SecurityState next) {
     _state = next;
     notifyListeners();

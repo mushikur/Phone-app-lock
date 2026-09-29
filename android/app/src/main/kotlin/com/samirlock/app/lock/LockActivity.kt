@@ -25,6 +25,7 @@ import com.samirlock.app.auth.PinVault
 import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.LockCoordinator
+import com.samirlock.app.notifications.NotificationPrivacyService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -305,6 +306,9 @@ class LockActivity : FragmentActivity() {
         wasUnlocked = true
         lockoutStore.recordSuccess()
         LockCoordinator.onUnlocked(lockedPackage)
+        // The app is open to the user now, so the stand-in for its hidden
+        // notifications has nothing left to hide.
+        NotificationPrivacyService.onPackageUnlocked(lockedPackage)
         pad.release()
         finish()
         overridePendingTransition(0, 0)

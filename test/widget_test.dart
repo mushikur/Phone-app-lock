@@ -317,6 +317,65 @@ void main() {
       );
     });
 
+    testWidgets('hiding notifications needs notification access first', (
+      tester,
+    ) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        buildApp(
+          security: FakeSecurityRepository(
+            hasPin: true,
+            isNotificationAccessGranted: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      final toggle = tester.widget<Switch>(
+        find.byKey(SecuritySettingsScreen.notificationPrivacyKey),
+      );
+      expect(toggle.onChanged, isNull);
+      expect(find.text('Grant notification access'), findsOneWidget);
+    });
+
+    testWidgets('opens the notification access screen', (tester) async {
+      useTallSurface(tester);
+      final security = FakeSecurityRepository(
+        hasPin: true,
+        isNotificationAccessGranted: false,
+      );
+
+      await tester.pumpWidget(buildApp(security: security));
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      await tester.tap(find.byKey(SecuritySettingsScreen.notificationAccessKey));
+      await tester.pumpAndSettle();
+
+      expect(security.notificationAccessRequests, 1);
+    });
+
+    testWidgets('turning notification hiding on reaches the native layer', (
+      tester,
+    ) async {
+      useTallSurface(tester);
+      final security = FakeSecurityRepository(hasPin: true);
+
+      await tester.pumpWidget(buildApp(security: security));
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      await tester.tap(
+        find.byKey(SecuritySettingsScreen.notificationPrivacyKey),
+      );
+      await tester.pumpAndSettle();
+
+      expect(security.notificationPrivacyCalls, [true]);
+      expect(security.isNotificationPrivacyEnabled, isTrue);
+      expect(find.text('Grant notification access'), findsNothing);
+    });
+
     testWidgets('explains the wrong-PIN protection', (tester) async {
       useTallSurface(tester);
       await tester.pumpWidget(

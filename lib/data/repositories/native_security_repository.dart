@@ -28,6 +28,23 @@ class NativeSecurityRepository implements SecurityRepository {
     return _toStatus(raw);
   }
 
+  @override
+  Future<SecurityStatus> setNotificationPrivacyEnabled(bool enabled) async {
+    final raw = await _guard(
+      () => _bridge.setNotificationPrivacyEnabled(enabled),
+      'Could not change notification privacy.',
+    );
+    return _toStatus(raw);
+  }
+
+  @override
+  Future<bool> openNotificationAccess() {
+    return _guard(
+      _bridge.openNotificationAccess,
+      'Could not open notification access settings.',
+    );
+  }
+
   SecurityStatus _toStatus(Map<String, Object?> raw) {
     return SecurityStatus(
       hasPin: raw['hasPin'] as bool? ?? false,
@@ -35,6 +52,10 @@ class NativeSecurityRepository implements SecurityRepository {
       isBiometricEnabled: raw['biometricEnabled'] as bool? ?? true,
       freeAttempts: raw['freeAttempts'] as int? ?? 0,
       failedAttempts: raw['failedAttempts'] as int? ?? 0,
+      isNotificationPrivacyEnabled:
+          raw['notificationPrivacyEnabled'] as bool? ?? false,
+      isNotificationAccessGranted:
+          raw['notificationAccessGranted'] as bool? ?? false,
     );
   }
 
