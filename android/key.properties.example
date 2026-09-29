@@ -1,0 +1,12 @@
+# Copy to android/key.properties and fill in, then keep that file out of git.
+#
+# Generate a keystore first (keep the file and the passwords somewhere safe -
+# losing them means you can never update the app on Play again):
+#
+#   keytool -genkey -v -keystore samir-lock-release.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias samir-lock
+#
+storeFile=../samir-lock-release.jks
+storePassword=
+keyAlias=samir-lock
+keyPassword=
