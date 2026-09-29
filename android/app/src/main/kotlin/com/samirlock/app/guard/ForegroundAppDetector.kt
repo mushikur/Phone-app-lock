@@ -63,11 +63,19 @@ class ForegroundAppDetector(context: Context) {
 
         if (resumeEvents == 0 && lastKnownPackage == null) {
             emptyReads++
-            // Loud enough to notice, rare enough not to flood: a run of these means
-            // usage access is not really working, whatever the permission says.
-            if (emptyReads % EMPTY_READ_LOG_EVERY == 0) {
+            // Usage events are written in batches and some builds are slow about
+            // it, so a run of empty reads does not necessarily mean no access.
+            // Aggregated stats are coarser but come from a different path, and are
+            // enough to learn which app is on screen.
+            if (emptyReads % FALLBACK_AFTER_EMPTY_READS == 0) {
+                val fallback = fallbackForegroundPackage(manager, nowMs)
+                if (fallback != null) {
+                    GuardLog.d("detector: seeded foreground from usage stats -> $fallback")
+                    lastKnownPackage = fallback
+                    return fallback
+                }
                 GuardLog.w(
-                    "detector: $emptyReads polls with no foreground app yet " +
+                    "detector: $emptyReads polls with no foreground app " +
                         "(window ${nowMs - begin}ms) - is usage access really granted?",
                 )
             }
@@ -76,6 +84,30 @@ class ForegroundAppDetector(context: Context) {
         }
 
         return lastKnownPackage
+    }
+
+    /**
+     * The most recently used app according to aggregated usage stats.
+     *
+     * Only a fallback: it reports recent use rather than the live foreground, so
+     * it is used to seed a value when the event stream has told us nothing at all.
+     */
+    private fun fallbackForegroundPackage(
+        manager: UsageStatsManager,
+        nowMs: Long,
+    ): String? {
+        val stats = runCatching {
+            manager.queryUsageStats(
+                UsageStatsManager.INTERVAL_BEST,
+                nowMs - FALLBACK_WINDOW_MS,
+                nowMs,
+            )
+        }.getOrNull()
+
+        return stats
+            ?.filter { it.lastTimeUsed > 0L }
+            ?.maxByOrNull { it.lastTimeUsed }
+            ?.packageName
     }
 
     /** Forgets the cached foreground app, for instance after the screen goes off. */
@@ -96,6 +128,9 @@ class ForegroundAppDetector(context: Context) {
 
     private companion object {
         const val INITIAL_LOOKBACK_MS = 10_000L
-        const val EMPTY_READ_LOG_EVERY = 30
+
+        /** Roughly ten seconds of polling before reaching for the coarser source. */
+        const val FALLBACK_AFTER_EMPTY_READS = 30
+        const val FALLBACK_WINDOW_MS = 60_000L
     }
 }

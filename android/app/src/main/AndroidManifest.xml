@@ -92,7 +92,17 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
+
+        <!-- Periodic safety net that puts the guard back up if it has been
+             reclaimed. Fired by an inexact alarm, so it needs no permission. -->
+        <receiver
+            android:name=".guard.GuardWatchdogReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

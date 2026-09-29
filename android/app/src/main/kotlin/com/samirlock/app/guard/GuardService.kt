@@ -115,6 +115,7 @@ class GuardService : Service() {
         }
 
         isRunning = true
+        GuardWatchdog.schedule(this)
 
         // Starting while the screen is off would poll into a dark screen until the
         // user picked the phone up; the screen-on broadcast starts the loop then.
@@ -127,6 +128,19 @@ class GuardService : Service() {
         // Android may restart the service after reclaiming memory; protection is
         // meant to keep working, so let it come back.
         return START_STICKY
+    }
+
+    /**
+     * Swiping Samir Lock out of Recents must not take protection down with it.
+     *
+     * The guard runs independently of that task, so there is nothing to restart
+     * here; what matters is that the safety net is armed in case the system
+     * reclaims the process afterwards.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        GuardLog.d("service: task removed, protection stays up")
+        GuardWatchdog.schedule(this)
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
@@ -190,10 +204,12 @@ class GuardService : Service() {
             return
         }
 
+        // Check this before querying usage events: with nothing locked there is
+        // no reason to do the expensive part of the poll at all.
         val lockedPackages = lockedAppsStore.lockedPackages()
-        val foregroundPackage = detector.currentForegroundPackage() ?: return
-
         if (lockedPackages.isEmpty()) return
+
+        val foregroundPackage = detector.currentForegroundPackage() ?: return
 
         val decision = LockCoordinator.onForegroundPackage(
             packageName = foregroundPackage,
@@ -205,7 +221,33 @@ class GuardService : Service() {
         if (decision is LockCoordinator.Decision.ShowLock) {
             GuardLog.d("service: locking ${decision.packageName} (${decision.reason})")
             showLockScreen(decision.packageName)
+            checkLaunchesAreLanding()
         }
+    }
+
+    /**
+     * Notices when lock screens are being asked for but never appear.
+     *
+     * Starting an activity from the background throws nothing when it is refused —
+     * the lock simply does not show — and the only reason Samir Lock is allowed to
+     * do it at all is the overlay permission. If that has been taken away, the
+     * honest response is to stop, so the app reports that it cannot protect
+     * anything instead of quietly protecting nothing.
+     */
+    private fun checkLaunchesAreLanding() {
+        if (LockCoordinator.unconfirmedLaunchCount() < UNCONFIRMED_LAUNCH_LIMIT) return
+
+        val overlay = permissionChecker.status(PermissionIds.DISPLAY_OVER_OTHER_APPS)
+        if (overlay == PermissionStatuses.GRANTED) {
+            GuardLog.w(
+                "service: ${LockCoordinator.unconfirmedLaunchCount()} lock launches " +
+                    "did not appear, but the overlay permission is granted; retrying",
+            )
+            return
+        }
+
+        GuardLog.w("service: lock screens cannot be shown (overlay=$overlay), stopping")
+        stopSelf()
     }
 
     /**
@@ -241,6 +283,9 @@ class GuardService : Service() {
 
         /** Roughly every 20 seconds at the poll interval above. */
         private const val USAGE_ACCESS_RECHECK_TICKS = 60L
+
+        /** Lock launches that may go unconfirmed before the cause is investigated. */
+        private const val UNCONFIRMED_LAUNCH_LIMIT = 3
 
         /** Whether the service is currently up, for reporting status to Flutter. */
         @Volatile

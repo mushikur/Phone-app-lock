@@ -1,5 +1,6 @@
 package com.samirlock.app.guard
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -43,13 +44,28 @@ object GuardServiceController {
 
         GuardLog.d("controller: starting guard service")
         val intent = Intent(context, GuardService::class.java)
-        return runCatching {
+
+        return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
             }
-        }.isSuccess
+            true
+        } catch (error: Exception) {
+            // Android 12+ refuses foreground service starts from the background.
+            // Samir Lock is normally exempt because it holds the overlay
+            // permission, so this mostly means that permission has gone — worth
+            // naming rather than swallowing.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                error is ForegroundServiceStartNotAllowedException
+            ) {
+                GuardLog.w("controller: not allowed to start the guard from the background", error)
+            } else {
+                GuardLog.w("controller: could not start the guard", error)
+            }
+            false
+        }
     }
 
     /**
@@ -75,6 +91,7 @@ object GuardServiceController {
     fun stop(context: Context) {
         GuardLog.configure(context)
         GuardLog.d("controller: stopping guard service")
+        GuardWatchdog.cancel(context)
         LockCoordinator.reset()
         runCatching { context.stopService(Intent(context, GuardService::class.java)) }
     }

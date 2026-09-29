@@ -46,6 +46,15 @@ object LockCoordinator {
     private var lastLaunchedAtMs = 0L
 
     /**
+     * Lock launches that were issued but never reported as visible.
+     *
+     * Starting an activity from the background fails silently when the overlay
+     * permission has gone: nothing throws, the lock simply never appears. Counting
+     * the launches nobody confirmed is what turns that silence into a signal.
+     */
+    private var unconfirmedLaunches = 0
+
+    /**
      * Feeds the currently foregrounded package into the state machine.
      *
      * @param packageName the app now in the foreground.
@@ -83,6 +92,7 @@ object LockCoordinator {
 
         lastLaunchedPackage = packageName
         lastLaunchedAtMs = nowMs
+        unconfirmedLaunches++
         return Decision.ShowLock(packageName)
     }
 
@@ -90,8 +100,16 @@ object LockCoordinator {
     @Synchronized
     fun onLockShown(packageName: String) {
         lockVisibleFor = packageName
+        unconfirmedLaunches = 0
         GuardLog.d("coordinator: lock visible for $packageName")
     }
+
+    /**
+     * How many lock launches in a row were issued without the lock screen ever
+     * appearing. Anything above one or two means the launches are being blocked.
+     */
+    @Synchronized
+    fun unconfirmedLaunchCount(): Int = unconfirmedLaunches
 
     /** The user satisfied the lock for [packageName]. */
     @Synchronized
@@ -141,6 +159,7 @@ object LockCoordinator {
         unlockedPackages.clear()
         foregroundPackage = null
         lockVisibleFor = null
+        unconfirmedLaunches = 0
         clearCooldown()
         GuardLog.d("coordinator: reset")
     }
@@ -149,7 +168,8 @@ object LockCoordinator {
     @Synchronized
     fun describeState(): String =
         "foreground=$foregroundPackage lockVisibleFor=$lockVisibleFor " +
-            "unlocked=$unlockedPackages lastLaunched=$lastLaunchedPackage"
+            "unlocked=$unlockedPackages lastLaunched=$lastLaunchedPackage " +
+            "unconfirmedLaunches=$unconfirmedLaunches"
 
     private fun clearCooldown() {
         lastLaunchedPackage = null

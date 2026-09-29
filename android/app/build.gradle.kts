@@ -48,6 +48,11 @@ dependencies {
     // covers fingerprint below API 28 as well as the modern prompt above it.
     // It brings androidx.fragment, which BiometricPrompt requires its host to be.
     implementation("androidx.biometric:biometric:1.1.0")
+
+    // Test only, never shipped: covers the lock decision rules and the lockout
+    // backoff, which decide whether apps stay protected and whether the owner
+    // can get back in.
+    testImplementation("junit:junit:4.13.2")
 }
 
 flutter {
