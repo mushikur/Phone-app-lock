@@ -186,14 +186,26 @@ class SecuritySettingsScreen extends StatelessWidget {
                 return SettingsGroup(
                   children: [
                     SettingsTile(
-                      icon: status.isNotificationPrivacyEnabled
+                      icon: status.isNotificationPrivacyActive
                           ? Icons.notifications_off
                           : Icons.notifications_none,
                       title: 'Hide notification content',
-                      subtitle: granted
-                          ? 'Notifications from locked apps show only the app '
-                              'name until you unlock them.'
-                          : 'Needs notification access before it can work.',
+                      // Says which precondition is unmet rather than showing a
+                      // switch that looks on and quietly does nothing.
+                      subtitle: switch (status.notificationPrivacyBlocker) {
+                        NotificationPrivacyBlocker.none =>
+                          'Active. Notifications from locked apps show only the '
+                              'app name until you unlock them.',
+                        NotificationPrivacyBlocker.noAccess =>
+                          'Needs notification access before it can work.',
+                        NotificationPrivacyBlocker.off =>
+                          'Notifications from locked apps show their content.',
+                        NotificationPrivacyBlocker.protectionOff =>
+                          'Waiting: turn protection on, otherwise nothing is '
+                              'locked to hide.',
+                        NotificationPrivacyBlocker.noLockedApps =>
+                          'Waiting: lock at least one app for this to apply to.',
+                      },
                       isEnabled: granted,
                       trailing: Semantics(
                         label: 'Hide notification content',

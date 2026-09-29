@@ -376,6 +376,67 @@ void main() {
       expect(find.text('Grant notification access'), findsNothing);
     });
 
+    testWidgets('says protection must be on for hiding to do anything', (
+      tester,
+    ) async {
+      // Regression: every precondition failed silently, so the switch could look
+      // on while nothing was being hidden.
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        buildApp(
+          security: FakeSecurityRepository(
+            hasPin: true,
+            isNotificationPrivacyEnabled: true,
+            isProtectionOn: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      expect(
+        find.textContaining('turn protection on'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('says an app must be locked for hiding to apply', (
+      tester,
+    ) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        buildApp(
+          security: FakeSecurityRepository(
+            hasPin: true,
+            isNotificationPrivacyEnabled: true,
+            lockedAppCount: 0,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      expect(find.textContaining('lock at least one app'), findsOneWidget);
+    });
+
+    testWidgets('reports hiding as active once everything is in place', (
+      tester,
+    ) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        buildApp(
+          security: FakeSecurityRepository(
+            hasPin: true,
+            isNotificationPrivacyEnabled: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      expect(find.textContaining('Active.'), findsOneWidget);
+    });
+
     testWidgets('explains the wrong-PIN protection', (tester) async {
       useTallSurface(tester);
       await tester.pumpWidget(

@@ -13,6 +13,14 @@
 -keep class com.samirlock.app.guard.BootReceiver { *; }
 -keep class com.samirlock.app.guard.GuardWatchdogReceiver { *; }
 
+# The notification listener. The system instantiates it by name from the
+# manifest and calls back into methods that nothing in our own code calls, so
+# keep its members as well as the class. AGP's implicit manifest keep covers the
+# class and its constructor, which is not enough to rely on here.
+-keep class com.samirlock.app.notifications.NotificationPrivacyService { *; }
+-keep class com.samirlock.app.notifications.NotificationPrivacy { *; }
+-keep class * extends android.service.notification.NotificationListenerService { *; }
+
 # Shared process-wide state between the service and the lock screen.
 -keep class com.samirlock.app.guard.LockCoordinator { *; }
 -keep class com.samirlock.app.lock.LockShield { *; }

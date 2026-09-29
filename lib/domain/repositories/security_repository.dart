@@ -17,6 +17,30 @@ enum BiometricAvailability {
   }
 }
 
+/// Why notification hiding is not doing anything, as reported by the native
+/// layer.
+///
+/// Hiding has several preconditions and every one of them used to fail in
+/// silence; this is what lets the settings screen say which one is unmet.
+enum NotificationPrivacyBlocker {
+  none('none'),
+  noAccess('noAccess'),
+  off('off'),
+  protectionOff('protectionOff'),
+  noLockedApps('noLockedApps');
+
+  const NotificationPrivacyBlocker(this.wireName);
+
+  final String wireName;
+
+  static NotificationPrivacyBlocker fromWireName(String? value) {
+    for (final blocker in NotificationPrivacyBlocker.values) {
+      if (blocker.wireName == value) return blocker;
+    }
+    return NotificationPrivacyBlocker.noAccess;
+  }
+}
+
 /// What the Flutter layer is allowed to know about authentication.
 ///
 /// Deliberately only two facts. The PIN, its hash and the decision to release a
@@ -30,6 +54,7 @@ class SecurityStatus {
     required this.failedAttempts,
     required this.isNotificationPrivacyEnabled,
     required this.isNotificationAccessGranted,
+    required this.notificationPrivacyBlocker,
   });
 
   const SecurityStatus.unknown()
@@ -39,7 +64,8 @@ class SecurityStatus {
         freeAttempts = 0,
         failedAttempts = 0,
         isNotificationPrivacyEnabled = false,
-        isNotificationAccessGranted = false;
+        isNotificationAccessGranted = false,
+        notificationPrivacyBlocker = NotificationPrivacyBlocker.noAccess;
 
   final bool hasPin;
   final BiometricAvailability biometric;
@@ -62,6 +88,13 @@ class SecurityStatus {
   /// Android notification access has been granted, without which hiding
   /// notifications is impossible.
   final bool isNotificationAccessGranted;
+
+  /// What is stopping notification hiding from working, if anything.
+  final NotificationPrivacyBlocker notificationPrivacyBlocker;
+
+  /// Notifications from locked apps are actually being hidden right now.
+  bool get isNotificationPrivacyActive =>
+      notificationPrivacyBlocker == NotificationPrivacyBlocker.none;
 
   /// The device can do biometrics right now.
   bool get canUseBiometrics => biometric == BiometricAvailability.available;

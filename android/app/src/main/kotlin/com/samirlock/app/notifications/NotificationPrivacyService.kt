@@ -7,6 +7,7 @@ import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.LockCoordinator
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Hides what notifications from locked apps say, while they are still locked.
@@ -26,8 +27,14 @@ class NotificationPrivacyService : NotificationListenerService() {
     private lateinit var preferences: GuardPreferences
     private lateinit var lockedAppsStore: LockedAppsStore
 
-    /** How many notifications are currently hidden per package. */
-    private val hiddenCounts = mutableMapOf<String, Int>()
+    /**
+     * How many notifications are currently hidden per package.
+     *
+     * Written from the binder thread that delivers notifications and read from
+     * the main thread when an app is unlocked, so it is concurrent rather than a
+     * plain map.
+     */
+    private val hiddenCounts = ConcurrentHashMap<String, Int>()
 
     override fun onCreate() {
         super.onCreate()
@@ -60,14 +67,13 @@ class NotificationPrivacyService : NotificationListenerService() {
         if (!shouldHide(notification)) return
 
         val packageName = notification.packageName
-        val count = (hiddenCounts[packageName] ?: 0) + 1
-        hiddenCounts[packageName] = count
+        val count = hiddenCounts.merge(packageName, 1, Int::plus) ?: 1
 
         // Take the original down first, so its content is never left on screen.
         runCatching { cancelNotification(notification.key) }
             .onFailure {
                 GuardLog.w("privacy: could not take down a notification", it)
-                hiddenCounts[packageName] = count - 1
+                hiddenCounts.merge(packageName, -1, Int::plus)
                 return
             }
 
@@ -93,8 +99,9 @@ class NotificationPrivacyService : NotificationListenerService() {
      * user asked for this.
      */
     private fun shouldHide(sbn: StatusBarNotification): Boolean {
-        if (!preferences.isNotificationPrivacyEnabled) return false
-        if (!preferences.isProtectionEnabled) return false
+        // One source of truth with the settings screen: whatever it tells the
+        // user is blocking hiding is exactly what is checked here.
+        if (!NotificationPrivacyState.isActive(this)) return false
 
         val packageName = sbn.packageName ?: return false
         if (packageName == this.packageName) return false

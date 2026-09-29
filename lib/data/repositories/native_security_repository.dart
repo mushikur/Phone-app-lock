@@ -56,6 +56,9 @@ class NativeSecurityRepository implements SecurityRepository {
           raw['notificationPrivacyEnabled'] as bool? ?? false,
       isNotificationAccessGranted:
           raw['notificationAccessGranted'] as bool? ?? false,
+      notificationPrivacyBlocker: NotificationPrivacyBlocker.fromWireName(
+        raw['notificationPrivacyBlocker'] as String?,
+      ),
     );
   }
 

@@ -12,6 +12,8 @@ class FakeSecurityRepository implements SecurityRepository {
     this.failedAttempts = 0,
     this.isNotificationPrivacyEnabled = false,
     this.isNotificationAccessGranted = true,
+    this.isProtectionOn = true,
+    this.lockedAppCount = 2,
     this.failOnLoad = false,
     this.pinSetupOpens = true,
     this.failOnWrite = false,
@@ -23,6 +25,10 @@ class FakeSecurityRepository implements SecurityRepository {
   int failedAttempts;
   bool isNotificationPrivacyEnabled;
   bool isNotificationAccessGranted;
+
+  /// Stand-ins for the other two preconditions the native layer checks.
+  bool isProtectionOn;
+  int lockedAppCount;
   final bool failOnLoad;
   final bool pinSetupOpens;
   final bool failOnWrite;
@@ -72,6 +78,15 @@ class FakeSecurityRepository implements SecurityRepository {
     return true;
   }
 
+  /// Mirrors the native precondition order.
+  NotificationPrivacyBlocker get _blocker {
+    if (!isNotificationAccessGranted) return NotificationPrivacyBlocker.noAccess;
+    if (!isNotificationPrivacyEnabled) return NotificationPrivacyBlocker.off;
+    if (!isProtectionOn) return NotificationPrivacyBlocker.protectionOff;
+    if (lockedAppCount == 0) return NotificationPrivacyBlocker.noLockedApps;
+    return NotificationPrivacyBlocker.none;
+  }
+
   SecurityStatus _status() => SecurityStatus(
         hasPin: hasPin,
         biometric: biometric,
@@ -80,6 +95,7 @@ class FakeSecurityRepository implements SecurityRepository {
         failedAttempts: failedAttempts,
         isNotificationPrivacyEnabled: isNotificationPrivacyEnabled,
         isNotificationAccessGranted: isNotificationAccessGranted,
+        notificationPrivacyBlocker: _blocker,
       );
 
   @override

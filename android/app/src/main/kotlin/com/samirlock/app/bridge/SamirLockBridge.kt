@@ -14,6 +14,7 @@ import com.samirlock.app.auth.PinVault
 import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.lock.PinSetupActivity
 import com.samirlock.app.notifications.NotificationPrivacy
+import com.samirlock.app.notifications.NotificationPrivacyState
 import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.GuardServiceController
@@ -310,6 +311,9 @@ class SamirLockBridge(
         KEY_FAILED_ATTEMPTS to lockoutStore.failedAttempts,
         KEY_NOTIFICATION_PRIVACY to guardPreferences.isNotificationPrivacyEnabled,
         KEY_NOTIFICATION_ACCESS to NotificationPrivacy.hasAccess(appContext),
+        // Why hiding is or is not doing anything, so the screen can say so
+        // instead of showing a switch that appears on and does nothing.
+        KEY_NOTIFICATION_BLOCKER to NotificationPrivacyState.blocker(appContext).wireName,
     )
 
     private fun setProtectionEnabled(enabled: Boolean): Map<String, Any?> {
@@ -381,6 +385,7 @@ class SamirLockBridge(
         const val KEY_FAILED_ATTEMPTS = "failedAttempts"
         const val KEY_NOTIFICATION_PRIVACY = "notificationPrivacyEnabled"
         const val KEY_NOTIFICATION_ACCESS = "notificationAccessGranted"
+        const val KEY_NOTIFICATION_BLOCKER = "notificationPrivacyBlocker"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"
