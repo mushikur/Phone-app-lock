@@ -13,7 +13,19 @@ class MainActivity : FlutterActivity() {
         bridge = SamirLockBridge(
             context = applicationContext,
             messenger = flutterEngine.dartExecutor.binaryMessenger,
-        ).also { it.attach() }
+        ).also {
+            it.attach()
+            it.activity = this
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        bridge?.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {

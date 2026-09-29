@@ -3,8 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:samir_lock/app.dart';
 
 import 'fakes/fake_app_inventory_repository.dart';
+import 'fakes/fake_permission_repository.dart';
 
 void main() {
+  /// The app list sits behind the permission gate, so these tests start from a
+  /// device where the required permissions are already granted.
+  Widget buildApp(FakeAppInventoryRepository inventory) {
+    return SamirLockApp(
+      inventoryRepository: inventory,
+      permissionRepository: FakePermissionRepository.allGranted(),
+    );
+  }
+
   testWidgets('renders the installed apps with their lock state', (
     tester,
   ) async {
@@ -12,7 +22,7 @@ void main() {
       lockedPackages: {'com.example.chat'},
     );
 
-    await tester.pumpWidget(SamirLockApp(repository: repository));
+    await tester.pumpWidget(buildApp(repository));
     await tester.pumpAndSettle();
 
     expect(find.text('Chat'), findsOneWidget);
@@ -25,7 +35,7 @@ void main() {
   ) async {
     final repository = FakeAppInventoryRepository();
 
-    await tester.pumpWidget(SamirLockApp(repository: repository));
+    await tester.pumpWidget(buildApp(repository));
     await tester.pumpAndSettle();
 
     expect(find.text('0 of 3 locked'), findsOneWidget);
@@ -38,9 +48,7 @@ void main() {
   });
 
   testWidgets('searching narrows the list', (tester) async {
-    await tester.pumpWidget(
-      SamirLockApp(repository: FakeAppInventoryRepository()),
-    );
+    await tester.pumpWidget(buildApp(FakeAppInventoryRepository()));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'gall');
@@ -52,7 +60,7 @@ void main() {
 
   testWidgets('shows an error state with a retry action', (tester) async {
     await tester.pumpWidget(
-      SamirLockApp(repository: FakeAppInventoryRepository(failOnLoad: true)),
+      buildApp(FakeAppInventoryRepository(failOnLoad: true)),
     );
     await tester.pumpAndSettle();
 

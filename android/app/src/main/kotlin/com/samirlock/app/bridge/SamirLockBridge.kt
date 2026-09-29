@@ -1,10 +1,17 @@
 package com.samirlock.app.bridge
 
+import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.inventory.InstalledAppsProvider
+import com.samirlock.app.permissions.PermissionChecker
+import com.samirlock.app.permissions.PermissionIds
+import com.samirlock.app.permissions.PermissionSettingsLauncher
+import com.samirlock.app.permissions.PermissionStatuses
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -16,6 +23,9 @@ import java.util.concurrent.Executors
  *
  * Work that touches the package manager runs on a background executor; results are
  * always delivered back on the platform thread, as MethodChannel requires.
+ * Permission checks are cheap and stay on the platform thread, and the ones that
+ * need a window — settings pages and the notification prompt — go through
+ * [activity], which the hosting Activity binds and clears.
  */
 class SamirLockBridge(
     context: Context,
@@ -24,9 +34,17 @@ class SamirLockBridge(
 
     private val appsProvider = InstalledAppsProvider(context)
     private val lockedAppsStore = LockedAppsStore(context)
+    private val permissionChecker = PermissionChecker(context)
+    private val settingsLauncher = PermissionSettingsLauncher(context)
     private val channel = MethodChannel(messenger, CHANNEL_NAME)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var executor: ExecutorService? = null
+
+    /** Set while an Activity is hosting the Flutter engine. */
+    var activity: Activity? = null
+
+    /** Reply waiting on the POST_NOTIFICATIONS system prompt, if any. */
+    private var pendingNotificationResult: MethodChannel.Result? = null
 
     fun attach() {
         executor = Executors.newSingleThreadExecutor()
@@ -37,6 +55,8 @@ class SamirLockBridge(
         channel.setMethodCallHandler(null)
         executor?.shutdownNow()
         executor = null
+        pendingNotificationResult = null
+        activity = null
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -60,8 +80,91 @@ class SamirLockBridge(
                 runInBackground(result) { lockedAppsStore.setLocked(packageName, locked) }
             }
 
+            METHOD_GET_PERMISSION_STATUSES -> result.success(permissionChecker.snapshot())
+
+            METHOD_OPEN_PERMISSION_SETTINGS -> {
+                val permissionId = call.argument<String>(ARG_PERMISSION)
+                if (permissionId.isNullOrEmpty() || permissionId !in PermissionIds.all) {
+                    result.error(
+                        ERROR_INVALID_ARGUMENTS,
+                        "openPermissionSettings requires a known permission id.",
+                        null,
+                    )
+                    return
+                }
+                result.success(settingsLauncher.open(permissionId, activity))
+            }
+
+            METHOD_REQUEST_NOTIFICATION_PERMISSION -> requestNotificationPermission(result)
+
             else -> result.notImplemented()
         }
+    }
+
+    /**
+     * Shows the POST_NOTIFICATIONS prompt where it exists, replying with the
+     * resulting status. On older Android versions there is no prompt, so the
+     * current status is returned unchanged and the UI falls back to Settings.
+     */
+    private fun requestNotificationPermission(result: MethodChannel.Result) {
+        val currentStatus = permissionChecker.status(PermissionIds.NOTIFICATIONS)
+        if (currentStatus == PermissionStatuses.GRANTED ||
+            !permissionChecker.canRequestNotificationPermission()
+        ) {
+            result.success(currentStatus)
+            return
+        }
+
+        val host = activity
+        if (host == null) {
+            result.error(
+                ERROR_NO_ACTIVITY,
+                "The notification prompt needs a foreground window.",
+                null,
+            )
+            return
+        }
+
+        if (pendingNotificationResult != null) {
+            result.error(
+                ERROR_REQUEST_IN_PROGRESS,
+                "A notification permission request is already in progress.",
+                null,
+            )
+            return
+        }
+
+        pendingNotificationResult = result
+        host.requestPermissions(
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            REQUEST_CODE_NOTIFICATIONS,
+        )
+    }
+
+    /**
+     * Forwarded from the hosting Activity.
+     *
+     * @return true when this bridge consumed the result.
+     */
+    fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ): Boolean {
+        if (requestCode != REQUEST_CODE_NOTIFICATIONS) return false
+
+        val pending = pendingNotificationResult ?: return true
+        pendingNotificationResult = null
+
+        val index = permissions.indexOf(Manifest.permission.POST_NOTIFICATIONS)
+        val granted = index >= 0 &&
+            grantResults.size > index &&
+            grantResults[index] == PackageManager.PERMISSION_GRANTED
+
+        pending.success(
+            if (granted) PermissionStatuses.GRANTED else PermissionStatuses.DENIED,
+        )
+        return true
     }
 
     private fun runInBackground(result: MethodChannel.Result, work: () -> Any?) {
@@ -86,12 +189,20 @@ class SamirLockBridge(
         const val METHOD_GET_INSTALLED_APPS = "getInstalledApps"
         const val METHOD_GET_LOCKED_PACKAGES = "getLockedPackages"
         const val METHOD_SET_APP_LOCKED = "setAppLocked"
+        const val METHOD_GET_PERMISSION_STATUSES = "getPermissionStatuses"
+        const val METHOD_OPEN_PERMISSION_SETTINGS = "openPermissionSettings"
+        const val METHOD_REQUEST_NOTIFICATION_PERMISSION = "requestNotificationPermission"
 
         const val ARG_PACKAGE_NAME = "packageName"
         const val ARG_LOCKED = "locked"
+        const val ARG_PERMISSION = "permission"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"
         const val ERROR_UNAVAILABLE = "bridge_unavailable"
+        const val ERROR_NO_ACTIVITY = "no_activity"
+        const val ERROR_REQUEST_IN_PROGRESS = "request_in_progress"
+
+        const val REQUEST_CODE_NOTIFICATIONS = 4801
     }
 }

@@ -34,4 +34,22 @@ class NativeBridge {
     });
     return result ?? locked;
   }
+
+  Future<Map<String, String>> getPermissionStatuses() async {
+    final statuses = await channel.invokeMapMethod<String, String>(
+      'getPermissionStatuses',
+    );
+    return statuses ?? const {};
+  }
+
+  Future<bool> openPermissionSettings(String permission) async {
+    final opened = await channel.invokeMethod<bool>('openPermissionSettings', {
+      'permission': permission,
+    });
+    return opened ?? false;
+  }
+
+  Future<String?> requestNotificationPermission() {
+    return channel.invokeMethod<String>('requestNotificationPermission');
+  }
 }
