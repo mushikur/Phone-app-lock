@@ -23,16 +23,25 @@ object GuardServiceController {
      */
     fun canRun(context: Context): Boolean {
         val checker = PermissionChecker(context)
-        return checker.status(PermissionIds.USAGE_ACCESS) == PermissionStatuses.GRANTED &&
-            checker.status(PermissionIds.DISPLAY_OVER_OTHER_APPS) == PermissionStatuses.GRANTED
+        val usageAccess = checker.status(PermissionIds.USAGE_ACCESS)
+        val overlay = checker.status(PermissionIds.DISPLAY_OVER_OTHER_APPS)
+        val canRun = usageAccess == PermissionStatuses.GRANTED &&
+            overlay == PermissionStatuses.GRANTED
+        if (!canRun) {
+            GuardLog.configure(context)
+            GuardLog.w("controller: cannot run, usageAccess=$usageAccess overlay=$overlay")
+        }
+        return canRun
     }
 
     fun isRunning(): Boolean = GuardService.isRunning
 
     /** @return true when the service was started. */
     fun start(context: Context): Boolean {
+        GuardLog.configure(context)
         if (!canRun(context)) return false
 
+        GuardLog.d("controller: starting guard service")
         val intent = Intent(context, GuardService::class.java)
         return runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -43,7 +52,29 @@ object GuardServiceController {
         }.isSuccess
     }
 
+    /**
+     * Brings the guard back up when the user has protection switched on but the
+     * service is not running.
+     *
+     * The stored flag is the user's intent; it survives the process being killed,
+     * an app update, or Android reclaiming memory, while the service does not.
+     * Without this, protection reads as "on" in the UI while nothing is actually
+     * watching. Called when the app starts and whenever its status is read.
+     *
+     * @return true when the guard is running, or was just started.
+     */
+    fun startIfEnabled(context: Context): Boolean {
+        if (!GuardPreferences(context).isProtectionEnabled) return false
+        if (isRunning()) return true
+
+        GuardLog.configure(context)
+        GuardLog.d("controller: protection is on but the guard is not running, restarting")
+        return start(context)
+    }
+
     fun stop(context: Context) {
+        GuardLog.configure(context)
+        GuardLog.d("controller: stopping guard service")
         LockCoordinator.reset()
         runCatching { context.stopService(Intent(context, GuardService::class.java)) }
     }

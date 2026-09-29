@@ -21,6 +21,9 @@ class ProtectionCard extends StatelessWidget {
     if (!state.canRun) {
       return 'Needs permission to watch your apps and show the lock screen.';
     }
+    if (state.isEnabled && !state.isRunning) {
+      return 'Starting up...';
+    }
     if (!state.isEnabled) {
       return 'Your locked apps will open without asking.';
     }
@@ -36,7 +39,7 @@ class ProtectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isOn = state.isEnabled;
+    final isOn = state.isOn;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),

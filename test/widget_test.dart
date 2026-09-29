@@ -115,6 +115,23 @@ void main() {
       );
     });
 
+    testWidgets('does not claim to be on when the guard cannot run', (
+      tester,
+    ) async {
+      // Regression: protection stayed switched on in storage while the service
+      // was not running, and the card said "Protection is on" regardless.
+      await tester.pumpWidget(
+        buildApp(
+          FakeAppInventoryRepository(),
+          protection: FakeProtectionRepository(isEnabled: true, canRun: false),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Protection is off'), findsOneWidget);
+      expect(find.text('Protection is on'), findsNothing);
+    });
+
     testWidgets('cannot be switched on without permission', (tester) async {
       final protection = FakeProtectionRepository(canRun: false);
 

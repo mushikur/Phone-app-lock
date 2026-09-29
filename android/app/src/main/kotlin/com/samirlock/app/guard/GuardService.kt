@@ -31,9 +31,9 @@ class GuardService : Service() {
     private lateinit var detector: ForegroundAppDetector
     private lateinit var lockedAppsStore: LockedAppsStore
     private lateinit var permissionChecker: PermissionChecker
-    private lateinit var preferences: GuardPreferences
 
     private var isPolling = false
+    private var ticks = 0L
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -47,6 +47,7 @@ class GuardService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> {
+                    GuardLog.d("service: screen off")
                     stopPolling()
                     // Everything relocks: the user has to unlock again after the
                     // screen comes back.
@@ -54,20 +55,24 @@ class GuardService : Service() {
                     detector.reset()
                 }
 
-                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> startPolling()
+                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
+                    GuardLog.d("service: ${intent.action?.substringAfterLast('.')}")
+                    startPolling()
+                }
             }
         }
     }
 
     override fun onCreate() {
         super.onCreate()
+        GuardLog.configure(this)
         detector = ForegroundAppDetector(this)
         lockedAppsStore = LockedAppsStore(this)
         permissionChecker = PermissionChecker(this)
-        preferences = GuardPreferences(this)
 
         GuardNotifications.ensureChannel(this)
         registerScreenReceiver()
+        GuardLog.d("service: created")
     }
 
     /**
@@ -92,9 +97,18 @@ class GuardService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startAsForeground()
 
+        val usageAccess = permissionChecker.status(PermissionIds.USAGE_ACCESS)
+        val overlay = permissionChecker.status(PermissionIds.DISPLAY_OVER_OTHER_APPS)
+        GuardLog.d(
+            "service: onStartCommand restart=${intent == null} " +
+                "usageAccess=$usageAccess overlay=$overlay " +
+                "locked=${lockedAppsStore.lockedPackages()}",
+        )
+
         // Usage access can be revoked while the service is running, and without it
         // there is nothing to watch.
-        if (!hasUsageAccess()) {
+        if (usageAccess != PermissionStatuses.GRANTED) {
+            GuardLog.w("service: stopping, usage access not granted")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -108,6 +122,7 @@ class GuardService : Service() {
     }
 
     override fun onDestroy() {
+        GuardLog.d("service: destroyed after $ticks polls")
         stopPolling()
         isRunning = false
         runCatching { unregisterReceiver(screenReceiver) }
@@ -138,18 +153,35 @@ class GuardService : Service() {
         if (isPolling) return
         isPolling = true
         handler.post(pollRunnable)
+        GuardLog.d("service: polling started (every ${POLL_INTERVAL_MS}ms)")
     }
 
     private fun stopPolling() {
+        if (!isPolling) return
         isPolling = false
         handler.removeCallbacks(pollRunnable)
+        GuardLog.d("service: polling stopped")
     }
 
     private fun tick() {
+        ticks++
+
+        // Usage access can be taken away at any time, and the poll would then
+        // silently return nothing forever; re-checking occasionally turns that
+        // into a clear stop instead of a mystery.
+        if (ticks % USAGE_ACCESS_RECHECK_TICKS == 0L &&
+            permissionChecker.status(PermissionIds.USAGE_ACCESS) != PermissionStatuses.GRANTED
+        ) {
+            GuardLog.w("service: usage access revoked, stopping")
+            stopSelf()
+            return
+        }
+
         val lockedPackages = lockedAppsStore.lockedPackages()
+        val foregroundPackage = detector.currentForegroundPackage() ?: return
+
         if (lockedPackages.isEmpty()) return
 
-        val foregroundPackage = detector.currentForegroundPackage() ?: return
         val decision = LockCoordinator.onForegroundPackage(
             packageName = foregroundPackage,
             lockedPackages = lockedPackages,
@@ -158,6 +190,7 @@ class GuardService : Service() {
         )
 
         if (decision is LockCoordinator.Decision.ShowLock) {
+            GuardLog.d("service: locking ${decision.packageName} (${decision.reason})")
             showLockScreen(decision.packageName)
         }
     }
@@ -171,17 +204,17 @@ class GuardService : Service() {
         val intent = LockActivity.intentFor(this, lockedPackage).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_NO_ANIMATION or
                     Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS,
             )
         }
         runCatching { startActivity(intent) }
-            .onFailure { LockCoordinator.onLockClosed(lockedPackage) }
+            .onSuccess { GuardLog.d("service: startActivity issued for $lockedPackage") }
+            .onFailure {
+                GuardLog.w("service: startActivity failed for $lockedPackage", it)
+                LockCoordinator.onLockClosed(lockedPackage)
+            }
     }
-
-    private fun hasUsageAccess(): Boolean =
-        permissionChecker.status(PermissionIds.USAGE_ACCESS) == PermissionStatuses.GRANTED
 
     companion object {
         /**
@@ -192,6 +225,9 @@ class GuardService : Service() {
          * while costing measurably more battery.
          */
         private const val POLL_INTERVAL_MS = 350L
+
+        /** Roughly every 20 seconds at the poll interval above. */
+        private const val USAGE_ACCESS_RECHECK_TICKS = 60L
 
         /** Whether the service is currently up, for reporting status to Flutter. */
         @Volatile

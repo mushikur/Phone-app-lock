@@ -5,7 +5,9 @@ package com.samirlock.app.guard
  *
  * Deliberately free of Android imports — the current time is passed in — so the
  * rules that matter most are plain, readable Kotlin that can be reasoned about
- * and unit tested without a device.
+ * and unit tested without a device. Every decision carries a [Decision.reason],
+ * which is what the service logs; that is how this is diagnosed on a real phone
+ * without the coordinator knowing anything about logging.
  *
  * A single instance is shared by [GuardService] and the lock screen, which live
  * in the same process. Every entry point is synchronised because the service
@@ -14,19 +16,24 @@ package com.samirlock.app.guard
 object LockCoordinator {
 
     sealed interface Decision {
+        /** Why this decision was reached, for diagnostics. */
+        val reason: String
+
         /** Nothing to do. */
-        data object None : Decision
+        data class None(override val reason: String) : Decision
 
         /** Show the lock screen for [packageName]. */
-        data class ShowLock(val packageName: String) : Decision
+        data class ShowLock(
+            val packageName: String,
+            override val reason: String = "locked app entered foreground",
+        ) : Decision
     }
 
     /**
      * How long to ignore a repeat launch for the same package.
      *
-     * Usage events trail the real foreground state by a tick or two, so without
-     * this the same app would be detected again before the lock screen has been
-     * reported as visible.
+     * Usage events trail the real foreground state, so without this the same app
+     * would be detected again before the lock screen has reported itself visible.
      */
     private const val RELAUNCH_COOLDOWN_MS = 1_200L
 
@@ -55,7 +62,7 @@ object LockCoordinator {
         // Our own UI and the lock screen itself are not app switches: returning
         // early keeps the protected app's unlocked state intact while the user is
         // looking at the lock screen.
-        if (packageName == selfPackage) return Decision.None
+        if (packageName == selfPackage) return Decision.None("own package in foreground")
 
         if (packageName != foregroundPackage) {
             // Leaving an app relocks it.
@@ -63,13 +70,15 @@ object LockCoordinator {
             foregroundPackage = packageName
         }
 
-        if (packageName !in lockedPackages) return Decision.None
-        if (packageName in unlockedPackages) return Decision.None
-        if (lockVisibleFor != null) return Decision.None
+        if (packageName !in lockedPackages) return Decision.None("not a locked app")
+        if (packageName in unlockedPackages) return Decision.None("already unlocked by user")
+        if (lockVisibleFor != null) {
+            return Decision.None("lock screen already showing for $lockVisibleFor")
+        }
         if (packageName == lastLaunchedPackage &&
             nowMs - lastLaunchedAtMs < RELAUNCH_COOLDOWN_MS
         ) {
-            return Decision.None
+            return Decision.None("launched ${nowMs - lastLaunchedAtMs}ms ago, within cooldown")
         }
 
         lastLaunchedPackage = packageName
@@ -81,6 +90,7 @@ object LockCoordinator {
     @Synchronized
     fun onLockShown(packageName: String) {
         lockVisibleFor = packageName
+        GuardLog.d("coordinator: lock visible for $packageName")
     }
 
     /** The user satisfied the lock for [packageName]. */
@@ -90,18 +100,30 @@ object LockCoordinator {
         foregroundPackage = packageName
         lockVisibleFor = null
         clearCooldown()
+        GuardLog.d("coordinator: $packageName unlocked")
     }
 
     /**
-     * The lock screen closed without being unlocked.
+     * The lock screen stopped being visible while the app behind it is still
+     * locked — the system stopped it, or the user navigated away.
      *
-     * The cooldown is cleared so that coming straight back to the app locks it
-     * again immediately rather than slipping through the repeat-launch guard.
+     * The lock is no longer considered on screen, so if the protected app comes
+     * back to the foreground the guard covers it again. The cooldown is cleared so
+     * that happens immediately rather than being swallowed by the repeat guard.
      */
+    @Synchronized
+    fun onLockHidden(packageName: String) {
+        if (lockVisibleFor == packageName) lockVisibleFor = null
+        clearCooldown()
+        GuardLog.d("coordinator: lock hidden for $packageName, will relock on re-entry")
+    }
+
+    /** The lock screen was destroyed without being unlocked. */
     @Synchronized
     fun onLockClosed(packageName: String) {
         if (lockVisibleFor == packageName) lockVisibleFor = null
         clearCooldown()
+        GuardLog.d("coordinator: lock closed for $packageName")
     }
 
     /** Everything relocks when the screen goes off. */
@@ -110,6 +132,7 @@ object LockCoordinator {
         unlockedPackages.clear()
         foregroundPackage = null
         clearCooldown()
+        GuardLog.d("coordinator: screen off, all apps relocked")
     }
 
     /** Forgets all state, for when protection is switched off. */
@@ -119,7 +142,14 @@ object LockCoordinator {
         foregroundPackage = null
         lockVisibleFor = null
         clearCooldown()
+        GuardLog.d("coordinator: reset")
     }
+
+    /** Current state, for logging. */
+    @Synchronized
+    fun describeState(): String =
+        "foreground=$foregroundPackage lockVisibleFor=$lockVisibleFor " +
+            "unlocked=$unlockedPackages lastLaunched=$lastLaunchedPackage"
 
     private fun clearCooldown() {
         lastLaunchedPackage = null

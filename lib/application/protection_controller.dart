@@ -26,6 +26,16 @@ class ProtectionState {
 
   bool get canRun => status.canRun;
 
+  /// The guard service is actually up.
+  bool get isRunning => status.isRunning;
+
+  /// What the user is shown.
+  ///
+  /// Protection is only presented as on when it is both switched on and able to
+  /// run: saying "on" while the guard cannot work is the one thing a lock app
+  /// must never do.
+  bool get isOn => status.isEnabled && status.canRun;
+
   /// Switched on, permitted, and the service is actually up.
   bool get isActive => status.isEnabled && status.isRunning;
 

@@ -66,6 +66,19 @@ void main() {
       expect(controller.state.isEnabled, isFalse);
     });
 
+    test('is never shown as on when the guard cannot run', () async {
+      // Regression: the stored flag said enabled while the guard was not
+      // running, and the card reported protection as on with nothing watching.
+      final controller = ProtectionController(
+        FakeProtectionRepository(isEnabled: true, canRun: false),
+      );
+
+      await controller.refresh();
+
+      expect(controller.state.isEnabled, isTrue);
+      expect(controller.state.isOn, isFalse);
+    });
+
     test('surfaces a native failure and clears the busy flag', () async {
       final repository = FakeProtectionRepository(failOnWrite: true);
       final controller = ProtectionController(repository);

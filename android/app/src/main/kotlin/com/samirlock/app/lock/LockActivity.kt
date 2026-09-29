@@ -9,6 +9,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import com.samirlock.app.R
+import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.LockCoordinator
 
 /**
@@ -30,6 +31,7 @@ class LockActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        GuardLog.configure(this)
 
         // Keeps the lock screen out of screenshots and the recents thumbnail.
         window.setFlags(
@@ -50,6 +52,7 @@ class LockActivity : Activity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         if (intent == null) return
+        GuardLog.d("lock: onNewIntent")
         setIntent(intent)
         wasUnlocked = false
         bind(intent)
@@ -59,6 +62,7 @@ class LockActivity : Activity() {
         val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME).orEmpty()
         if (packageName.isEmpty()) {
             // Nothing to protect: never sit on screen blocking the user with no reason.
+            GuardLog.w("lock: no package in intent, closing")
             finish()
             return
         }
@@ -69,6 +73,7 @@ class LockActivity : Activity() {
         val appName = loadAppLabel(packageName)
         findViewById<TextView>(R.id.lock_app_name).text = appName
         findViewById<ImageView>(R.id.lock_app_icon).setImageDrawable(loadAppIcon(packageName))
+        GuardLog.d("lock: showing for $packageName ($appName)")
     }
 
     private fun loadAppLabel(forPackage: String): String = runCatching {
@@ -81,6 +86,7 @@ class LockActivity : Activity() {
     }.getOrNull()
 
     private fun unlock() {
+        GuardLog.d("lock: unlocked (test action) for $lockedPackage")
         wasUnlocked = true
         LockCoordinator.onUnlocked(lockedPackage)
         // No animation: the protected app should simply be there.
@@ -94,20 +100,30 @@ class LockActivity : Activity() {
      */
     @Deprecated("Framework Activity has no back dispatcher; predictive back is off.")
     override fun onBackPressed() {
+        GuardLog.d("lock: back pressed, going home")
         goHome()
     }
 
     /**
-     * If the lock screen stops while it is still locked — Home, Recents, a swipe
-     * away — it closes rather than lingering as a stale screen. The protected app
-     * is behind it and still locked, so re-entering brings the lock straight back.
+     * If the lock screen stops while the app behind it is still locked, it reports
+     * itself hidden and stays alive.
+     *
+     * It deliberately does not finish here. The system stops this activity for
+     * reasons that are not the user giving up — a transition, the protected app
+     * drawing again, an OEM task shuffle — and finishing on any of those reveals
+     * the very app that is supposed to be covered. Reporting "hidden" instead lets
+     * the guard cover the app again the moment it is seen in the foreground.
      */
     override fun onStop() {
         super.onStop()
-        if (!wasUnlocked && !isFinishing) finish()
+        if (!wasUnlocked) {
+            GuardLog.d("lock: stopped while still locked, staying alive")
+            LockCoordinator.onLockHidden(lockedPackage)
+        }
     }
 
     override fun onDestroy() {
+        GuardLog.d("lock: destroyed (wasUnlocked=$wasUnlocked)")
         if (!wasUnlocked) LockCoordinator.onLockClosed(lockedPackage)
         super.onDestroy()
     }
@@ -117,6 +133,7 @@ class LockActivity : Activity() {
             .addCategory(Intent.CATEGORY_HOME)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { startActivity(home) }
+            .onFailure { GuardLog.w("lock: could not go home", it) }
         finish()
         overridePendingTransition(0, 0)
     }

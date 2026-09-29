@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import com.samirlock.app.data.LockedAppsStore
+import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.GuardServiceController
 import com.samirlock.app.inventory.InstalledAppsProvider
@@ -51,6 +52,10 @@ class SamirLockBridge(
     private var pendingNotificationResult: MethodChannel.Result? = null
 
     fun attach() {
+        GuardLog.configure(appContext)
+        // The service does not survive the process being killed, but the user's
+        // choice does; bring the guard back up before the UI asks about it.
+        GuardServiceController.startIfEnabled(appContext)
         executor = Executors.newSingleThreadExecutor()
         channel.setMethodCallHandler(this)
     }
@@ -81,7 +86,14 @@ class SamirLockBridge(
                     )
                     return
                 }
-                runInBackground(result) { lockedAppsStore.setLocked(packageName, locked) }
+                runInBackground(result) {
+                    val state = lockedAppsStore.setLocked(packageName, locked)
+                    GuardLog.d(
+                        "bridge: setAppLocked $packageName=$locked, " +
+                            "locked now ${lockedAppsStore.lockedPackages()}",
+                    )
+                    state
+                }
             }
 
             METHOD_GET_PERMISSION_STATUSES -> result.success(permissionChecker.snapshot())
@@ -190,11 +202,20 @@ class SamirLockBridge(
      * Whether protection is switched on, whether the service is actually up, and
      * whether the permissions it needs are in place.
      */
-    private fun protectionStatus(): Map<String, Any?> = mapOf(
-        KEY_ENABLED to guardPreferences.isProtectionEnabled,
-        KEY_RUNNING to GuardServiceController.isRunning(),
-        KEY_CAN_RUN to GuardServiceController.canRun(appContext),
-    )
+    private fun protectionStatus(): Map<String, Any?> {
+        // Reading the status is also the moment to heal it: if protection is meant
+        // to be on and the guard is down, start it rather than reporting a state
+        // that is not true.
+        GuardServiceController.startIfEnabled(appContext)
+
+        val status = mapOf(
+            KEY_ENABLED to guardPreferences.isProtectionEnabled,
+            KEY_RUNNING to GuardServiceController.isRunning(),
+            KEY_CAN_RUN to GuardServiceController.canRun(appContext),
+        )
+        GuardLog.d("bridge: protection status $status")
+        return status
+    }
 
     /**
      * Starts or stops the guard and remembers the choice.
@@ -204,6 +225,7 @@ class SamirLockBridge(
      * what is missing rather than showing protection as on when it is not.
      */
     private fun setProtectionEnabled(enabled: Boolean): Map<String, Any?> {
+        GuardLog.d("bridge: setProtectionEnabled($enabled)")
         if (!enabled) {
             GuardServiceController.stop(appContext)
             guardPreferences.isProtectionEnabled = false
