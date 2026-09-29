@@ -1,4 +1,4 @@
-package com.example.samir_lock
+package com.samirlock.app
 
 import io.flutter.embedding.android.FlutterActivity
 
