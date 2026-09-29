@@ -17,6 +17,7 @@ import android.os.SystemClock
 object GuardWatchdog {
 
     private const val REQUEST_CODE = 4803
+    private const val RETRY_REQUEST_CODE = 4804
 
     /** Long enough that the alarm is cheap, short enough to notice a kill. */
     private val INTERVAL_MS = AlarmManager.INTERVAL_FIFTEEN_MINUTES
@@ -37,16 +38,44 @@ object GuardWatchdog {
             .onFailure { GuardLog.w("watchdog: could not schedule", it) }
     }
 
+    /**
+     * A one-off nudge a little way out.
+     *
+     * Boot is the busiest moment on the device and a start can be refused for
+     * reasons that have gone away seconds later; without this the next chance
+     * would be a quarter of an hour away.
+     */
+    fun scheduleRetry(context: Context, delayMs: Long) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
+        runCatching {
+            alarmManager.set(
+                AlarmManager.ELAPSED_REALTIME,
+                SystemClock.elapsedRealtime() + delayMs,
+                retryPendingIntent(context),
+            )
+        }
+            .onSuccess { GuardLog.d("watchdog: retry scheduled in ${delayMs / 1000}s") }
+            .onFailure { GuardLog.w("watchdog: could not schedule retry", it) }
+    }
+
     fun cancel(context: Context) {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
         runCatching { alarmManager.cancel(pendingIntent(context)) }
+        runCatching { alarmManager.cancel(retryPendingIntent(context)) }
         GuardLog.d("watchdog: cancelled")
     }
 
-    private fun pendingIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
-        context,
-        REQUEST_CODE,
-        Intent(context, GuardWatchdogReceiver::class.java),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
+    private fun pendingIntent(context: Context): PendingIntent =
+        broadcastTo(context, REQUEST_CODE)
+
+    private fun retryPendingIntent(context: Context): PendingIntent =
+        broadcastTo(context, RETRY_REQUEST_CODE)
+
+    private fun broadcastTo(context: Context, requestCode: Int): PendingIntent =
+        PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            Intent(context, GuardWatchdogReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 }

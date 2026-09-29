@@ -13,6 +13,7 @@ import android.os.Looper
 import android.os.PowerManager
 import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.lock.LockActivity
+import com.samirlock.app.lock.LockShield
 import com.samirlock.app.permissions.PermissionChecker
 import com.samirlock.app.permissions.PermissionIds
 import com.samirlock.app.permissions.PermissionStatuses
@@ -50,6 +51,7 @@ class GuardService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     GuardLog.d("service: screen off")
                     stopPolling()
+                    LockShield.hide()
                     // Everything relocks: the user has to unlock again after the
                     // screen comes back.
                     LockCoordinator.onScreenOff()
@@ -146,6 +148,7 @@ class GuardService : Service() {
     override fun onDestroy() {
         GuardLog.d("service: destroyed after $ticks polls")
         stopPolling()
+        LockShield.hide()
         isRunning = false
         runCatching { unregisterReceiver(screenReceiver) }
         LockCoordinator.reset()
@@ -247,6 +250,7 @@ class GuardService : Service() {
         }
 
         GuardLog.w("service: lock screens cannot be shown (overlay=$overlay), stopping")
+        LockShield.hide()
         stopSelf()
     }
 
@@ -256,6 +260,11 @@ class GuardService : Service() {
      * possible at all.
      */
     private fun showLockScreen(lockedPackage: String) {
+        // Cover the app first. Adding a window takes a frame, while starting an
+        // activity takes a couple of hundred milliseconds, and the protected app
+        // is on screen for every one of them.
+        LockShield.show(this)
+
         val intent = LockActivity.intentFor(this, lockedPackage).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -267,6 +276,7 @@ class GuardService : Service() {
             .onSuccess { GuardLog.d("service: startActivity issued for $lockedPackage") }
             .onFailure {
                 GuardLog.w("service: startActivity failed for $lockedPackage", it)
+                LockShield.hide()
                 LockCoordinator.onLockClosed(lockedPackage)
             }
     }
@@ -275,14 +285,17 @@ class GuardService : Service() {
         /**
          * How often the foreground app is checked while the screen is on.
          *
-         * Usage events are only written by the system every so often, so polling
-         * faster than this buys latency that the platform cannot actually deliver
-         * while costing measurably more battery.
+         * Every tick is a cheap incremental read of the events since the last one,
+         * and this is the half of the delay before the lock appears that is
+         * actually ours to control — the rest is the system's own lag in writing
+         * the event. Polling stops entirely while the screen is off, and skips the
+         * query altogether when no apps are locked, which is what keeps this
+         * affordable.
          */
-        private const val POLL_INTERVAL_MS = 350L
+        private const val POLL_INTERVAL_MS = 150L
 
         /** Roughly every 20 seconds at the poll interval above. */
-        private const val USAGE_ACCESS_RECHECK_TICKS = 60L
+        private const val USAGE_ACCESS_RECHECK_TICKS = 130L
 
         /** Lock launches that may go unconfirmed before the cause is investigated. */
         private const val UNCONFIRMED_LAUNCH_LIMIT = 3

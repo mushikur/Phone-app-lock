@@ -85,12 +85,18 @@
                 android:value="app_lock_foreground_monitoring" />
         </service>
 
+        <!--
+             Exported so the system's BOOT_COMPLETED broadcast reaches it. Every
+             action below is a protected broadcast that only the system may send,
+             so exporting this does not let another app trigger it.
+        -->
         <receiver
             android:name=".guard.BootReceiver"
             android:enabled="true"
-            android:exported="false">
-            <intent-filter>
+            android:exported="true">
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />

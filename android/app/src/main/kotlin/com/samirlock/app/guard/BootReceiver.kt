@@ -15,26 +15,40 @@ import android.content.Intent
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action !in RECOVERY_ACTIONS) return
-
         GuardLog.configure(context)
+        GuardLog.d("boot: received ${intent.action}")
+
+        if (intent.action !in RECOVERY_ACTIONS) return
         if (!GuardPreferences(context).isProtectionEnabled) {
             GuardLog.d("boot: protection is off, nothing to restore")
             return
         }
 
-        val started = GuardServiceController.start(context)
-        GuardLog.d("boot: ${intent.action} restored protection, started=$started")
-
-        // Arm the safety net even if the start was refused, so a later attempt
-        // can recover.
+        // The safety net goes up first, and unconditionally. A reboot clears every
+        // alarm the app had, so if this is not rescheduled here and the start
+        // below is refused, nothing would ever try again and protection would stay
+        // down until the user happened to open the app.
         GuardWatchdog.schedule(context)
+
+        val started = GuardServiceController.start(context)
+        GuardLog.d("boot: restore after ${intent.action} started=$started")
+
+        if (!started) {
+            // Boot is the busiest moment on the device; a refusal now is often
+            // gone a few seconds later.
+            GuardWatchdog.scheduleRetry(context, FIRST_RETRY_MS)
+        }
     }
 
     private companion object {
         val RECOVERY_ACTIONS = setOf(
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED,
+            // Some OEM builds send this instead of BOOT_COMPLETED after a fast
+            // boot. Harmless where it is never sent.
+            "android.intent.action.QUICKBOOT_POWERON",
         )
+
+        const val FIRST_RETRY_MS = 30_000L
     }
 }

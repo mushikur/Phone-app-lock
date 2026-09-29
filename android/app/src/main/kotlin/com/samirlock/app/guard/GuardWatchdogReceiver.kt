@@ -20,7 +20,22 @@ class GuardWatchdogReceiver : BroadcastReceiver() {
             return
         }
 
+        if (!GuardPreferences(context).isProtectionEnabled) {
+            GuardLog.d("watchdog: protection is off, nothing to do")
+            return
+        }
+
         val restarted = GuardServiceController.startIfEnabled(context)
         GuardLog.d("watchdog: guard was down, restarted=$restarted")
+
+        if (!restarted) {
+            // Still refused. Try again before the next scheduled sweep rather than
+            // leaving protection down for another quarter of an hour.
+            GuardWatchdog.scheduleRetry(context, RETRY_MS)
+        }
+    }
+
+    private companion object {
+        const val RETRY_MS = 60_000L
     }
 }

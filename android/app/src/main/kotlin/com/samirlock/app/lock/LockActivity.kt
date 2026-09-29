@@ -7,6 +7,7 @@ import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
@@ -88,6 +89,8 @@ class LockActivity : FragmentActivity() {
 
         findViewById<Button>(R.id.lock_open_app).setOnClickListener { openSamirLock() }
 
+        uncoverOnceDrawn()
+
         // Back must not reveal the app underneath, so it behaves like Home.
         onBackPressedDispatcher.addCallback(
             this,
@@ -100,6 +103,26 @@ class LockActivity : FragmentActivity() {
         )
 
         bind(intent)
+    }
+
+    /**
+     * Takes the shield away only once this screen has actually drawn.
+     *
+     * Removing it any earlier — when the activity is merely created — would
+     * uncover the protected app for the frames between, which is the whole thing
+     * the shield exists to prevent.
+     */
+    private fun uncoverOnceDrawn() {
+        val decorView = window.decorView
+        decorView.viewTreeObserver.addOnPreDrawListener(
+            object : ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    decorView.viewTreeObserver.removeOnPreDrawListener(this)
+                    decorView.post { LockShield.hide() }
+                    return true
+                }
+            },
+        )
     }
 
     /**
@@ -317,12 +340,18 @@ class LockActivity : FragmentActivity() {
             GuardLog.d("lock: stopped while still locked, staying alive")
             // Anything half-typed is discarded rather than waiting on screen.
             pad.clear()
+            // Whatever is on screen now is not the protected app — the user went
+            // elsewhere, or the screen went off — so the cover comes down with
+            // this screen rather than hanging over the launcher until it times
+            // out. The guard covers the app again on re-entry.
+            LockShield.hide()
             LockCoordinator.onLockHidden(lockedPackage)
         }
     }
 
     override fun onDestroy() {
         GuardLog.d("lock: destroyed (wasUnlocked=$wasUnlocked)")
+        LockShield.hide()
         lockoutTimer?.cancel()
         pad.release()
         worker.shutdownNow()
