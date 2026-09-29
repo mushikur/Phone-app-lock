@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../application/app_list_controller.dart';
 import '../../application/protection_controller.dart';
+import '../../application/security_controller.dart';
 import '../../domain/entities/installed_app.dart';
 import '../widgets/app_list_tile.dart';
 import '../widgets/app_search_field.dart';
 import '../widgets/lock_summary_card.dart';
 import '../widgets/protection_card.dart';
+import '../widgets/security_card.dart';
 import '../widgets/state_views.dart';
 
 /// Main screen: the installed-app inventory with a lock toggle per app.
@@ -15,10 +17,12 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.protectionController,
+    required this.securityController,
   });
 
   final AppListController controller;
   final ProtectionController protectionController;
+  final SecurityController securityController;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -33,10 +37,15 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     widget.controller.load();
     widget.protectionController.refresh();
+    widget.securityController.refresh();
     // A permission revoked in Android Settings can stop the guard behind the
-    // app's back, so the status is re-read whenever the app comes forward.
+    // app's back, and the PIN is created on a native screen, so both are re-read
+    // whenever the app comes forward.
     _lifecycleListener = AppLifecycleListener(
-      onResume: () => widget.protectionController.refresh(showSpinner: false),
+      onResume: () {
+        widget.protectionController.refresh(showSpinner: false);
+        widget.securityController.refresh(showSpinner: false);
+      },
     );
   }
 
@@ -45,6 +54,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _lifecycleListener.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _onSetUpPin() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await widget.securityController.openPinSetup();
+    if (error == null) return;
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error)));
   }
 
   Future<void> _onProtectionChanged(bool enabled) async {
@@ -111,6 +130,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: LockSummaryCard(
                     lockedCount: state.lockedCount,
                     totalCount: state.totalCount,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: ListenableBuilder(
+                    listenable: widget.securityController,
+                    builder: (context, _) => SecurityCard(
+                      state: widget.securityController.state,
+                      onSetUpPin: _onSetUpPin,
+                    ),
                   ),
                 ),
                 Padding(

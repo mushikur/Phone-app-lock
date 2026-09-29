@@ -4,12 +4,14 @@ class ProtectionStatus {
     required this.isEnabled,
     required this.isRunning,
     required this.canRun,
+    required this.hasPin,
   });
 
   const ProtectionStatus.unknown()
       : isEnabled = false,
         isRunning = false,
-        canRun = false;
+        canRun = false,
+        hasPin = false;
 
   /// The user switched protection on.
   final bool isEnabled;
@@ -19,6 +21,9 @@ class ProtectionStatus {
 
   /// The permissions protection depends on are granted.
   final bool canRun;
+
+  /// A PIN exists, so the lock screen has something to authenticate against.
+  final bool hasPin;
 }
 
 /// Starts and stops the native guard, and reports its state.

@@ -79,6 +79,29 @@ void main() {
       expect(controller.state.isOn, isFalse);
     });
 
+    test('cannot be turned on without a PIN', () async {
+      final repository = FakeProtectionRepository(hasPin: false);
+      final controller = ProtectionController(repository);
+      await controller.refresh();
+
+      final error = await controller.setEnabled(true);
+
+      expect(error, isNotNull);
+      expect(error, contains('PIN'));
+      expect(controller.state.isEnabled, isFalse);
+      expect(controller.state.isOn, isFalse);
+    });
+
+    test('is not shown as on when the PIN has gone away', () async {
+      final controller = ProtectionController(
+        FakeProtectionRepository(isEnabled: true, hasPin: false),
+      );
+
+      await controller.refresh();
+
+      expect(controller.state.isOn, isFalse);
+    });
+
     test('surfaces a native failure and clears the busy flag', () async {
       final repository = FakeProtectionRepository(failOnWrite: true);
       final controller = ProtectionController(repository);

@@ -9,4 +9,6 @@
     <color name="lock_accent">#FF4C5BD4</color>
     <color name="lock_accent_soft">#1F4C5BD4</color>
     <color name="lock_on_accent">#FFFFFFFF</color>
+    <color name="lock_dot_empty">#1F000000</color>
+    <color name="lock_error">#FFBA1A1A</color>
 </resources>

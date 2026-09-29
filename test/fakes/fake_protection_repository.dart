@@ -5,6 +5,7 @@ class FakeProtectionRepository implements ProtectionRepository {
   FakeProtectionRepository({
     this.isEnabled = false,
     this.canRun = true,
+    this.hasPin = true,
     this.failOnLoad = false,
     this.failOnWrite = false,
   });
@@ -13,6 +14,9 @@ class FakeProtectionRepository implements ProtectionRepository {
 
   /// Whether the permissions protection depends on are granted.
   bool canRun;
+
+  /// Whether a PIN exists for the lock screen to check against.
+  bool hasPin;
   final bool failOnLoad;
   final bool failOnWrite;
 
@@ -33,8 +37,9 @@ class FakeProtectionRepository implements ProtectionRepository {
     if (failOnWrite) {
       throw const ProtectionException('Could not change protection.');
     }
-    // Mirrors the native side: enabling only sticks when it is allowed to run.
-    isEnabled = enabled && canRun;
+    // Mirrors the native side: enabling only sticks when it is allowed to run
+    // and there is a PIN to authenticate against.
+    isEnabled = enabled && canRun && hasPin;
     return _status();
   }
 
@@ -42,5 +47,6 @@ class FakeProtectionRepository implements ProtectionRepository {
         isEnabled: isEnabled,
         isRunning: isEnabled,
         canRun: canRun,
+        hasPin: hasPin,
       );
 }

@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.lock.LockActivity
 import com.samirlock.app.permissions.PermissionChecker
@@ -114,7 +115,14 @@ class GuardService : Service() {
         }
 
         isRunning = true
-        startPolling()
+
+        // Starting while the screen is off would poll into a dark screen until the
+        // user picked the phone up; the screen-on broadcast starts the loop then.
+        if (isScreenInteractive()) {
+            startPolling()
+        } else {
+            GuardLog.d("service: screen is off, waiting for it to come on")
+        }
 
         // Android may restart the service after reclaiming memory; protection is
         // meant to keep working, so let it come back.
@@ -147,6 +155,11 @@ class GuardService : Service() {
         } else {
             startForeground(GuardNotifications.NOTIFICATION_ID, notification)
         }
+    }
+
+    private fun isScreenInteractive(): Boolean {
+        val power = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+        return power.isInteractive
     }
 
     private fun startPolling() {

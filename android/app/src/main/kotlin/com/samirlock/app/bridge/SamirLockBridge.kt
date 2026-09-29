@@ -3,10 +3,14 @@ package com.samirlock.app.bridge
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
+import com.samirlock.app.auth.BiometricAuthenticator
+import com.samirlock.app.auth.PinVault
 import com.samirlock.app.data.LockedAppsStore
+import com.samirlock.app.lock.PinSetupActivity
 import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.GuardServiceController
@@ -40,6 +44,7 @@ class SamirLockBridge(
     private val permissionChecker = PermissionChecker(context)
     private val settingsLauncher = PermissionSettingsLauncher(context)
     private val guardPreferences = GuardPreferences(context)
+    private val pinVault = PinVault(context)
     private val appContext = context.applicationContext
     private val channel = MethodChannel(messenger, CHANNEL_NAME)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -114,6 +119,25 @@ class SamirLockBridge(
             METHOD_REQUEST_NOTIFICATION_PERMISSION -> requestNotificationPermission(result)
 
             METHOD_GET_PROTECTION_STATUS -> result.success(protectionStatus())
+
+            METHOD_GET_SECURITY_STATUS -> result.success(securityStatus())
+
+            METHOD_OPEN_PIN_SETUP -> {
+                val host = activity
+                if (host == null) {
+                    result.error(
+                        ERROR_NO_ACTIVITY,
+                        "PIN setup needs a foreground window.",
+                        null,
+                    )
+                    return
+                }
+                // The PIN is typed natively; nothing about it comes back here.
+                val opened = runCatching {
+                    host.startActivity(Intent(host, PinSetupActivity::class.java))
+                }.isSuccess
+                result.success(opened)
+            }
 
             METHOD_SET_PROTECTION_ENABLED -> {
                 val enabled = call.argument<Boolean>(ARG_ENABLED)
@@ -212,6 +236,7 @@ class SamirLockBridge(
             KEY_ENABLED to guardPreferences.isProtectionEnabled,
             KEY_RUNNING to GuardServiceController.isRunning(),
             KEY_CAN_RUN to GuardServiceController.canRun(appContext),
+            KEY_HAS_PIN to pinVault.hasPin(),
         )
         GuardLog.d("bridge: protection status $status")
         return status
@@ -224,10 +249,28 @@ class SamirLockBridge(
      * missing: the returned status simply still says disabled, and the UI reports
      * what is missing rather than showing protection as on when it is not.
      */
+    /**
+     * What the Flutter layer is allowed to know about authentication: whether a
+     * PIN exists and whether biometrics are usable. Never the PIN, never the
+     * stored record, and nothing that could release a lock.
+     */
+    private fun securityStatus(): Map<String, Any?> = mapOf(
+        KEY_HAS_PIN to pinVault.hasPin(),
+        KEY_BIOMETRIC to BiometricAuthenticator.availabilityOf(appContext).name,
+    )
+
     private fun setProtectionEnabled(enabled: Boolean): Map<String, Any?> {
         GuardLog.d("bridge: setProtectionEnabled($enabled)")
         if (!enabled) {
             GuardServiceController.stop(appContext)
+            guardPreferences.isProtectionEnabled = false
+            return protectionStatus()
+        }
+
+        // Without a PIN the lock screen has nothing to authenticate against, so
+        // protection must not claim to be on.
+        if (!pinVault.hasPin()) {
+            GuardLog.w("bridge: refusing to enable protection, no PIN set")
             guardPreferences.isProtectionEnabled = false
             return protectionStatus()
         }
@@ -264,6 +307,8 @@ class SamirLockBridge(
         const val METHOD_REQUEST_NOTIFICATION_PERMISSION = "requestNotificationPermission"
         const val METHOD_GET_PROTECTION_STATUS = "getProtectionStatus"
         const val METHOD_SET_PROTECTION_ENABLED = "setProtectionEnabled"
+        const val METHOD_GET_SECURITY_STATUS = "getSecurityStatus"
+        const val METHOD_OPEN_PIN_SETUP = "openPinSetup"
 
         const val ARG_PACKAGE_NAME = "packageName"
         const val ARG_LOCKED = "locked"
@@ -273,6 +318,8 @@ class SamirLockBridge(
         const val KEY_ENABLED = "enabled"
         const val KEY_RUNNING = "running"
         const val KEY_CAN_RUN = "canRun"
+        const val KEY_HAS_PIN = "hasPin"
+        const val KEY_BIOMETRIC = "biometric"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"

@@ -21,6 +21,9 @@ class ProtectionCard extends StatelessWidget {
     if (!state.canRun) {
       return 'Needs permission to watch your apps and show the lock screen.';
     }
+    if (!state.hasPin) {
+      return 'Create a PIN above to turn protection on.';
+    }
     if (state.isEnabled && !state.isRunning) {
       return 'Starting up...';
     }
@@ -104,7 +107,7 @@ class ProtectionCard extends StatelessWidget {
             Switch(
               key: switchKey,
               value: isOn,
-              onChanged: state.canRun ? onChanged : null,
+              onChanged: state.canRun && state.hasPin ? onChanged : null,
             ),
         ],
       ),

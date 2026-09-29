@@ -34,7 +34,10 @@ class ProtectionState {
   /// Protection is only presented as on when it is both switched on and able to
   /// run: saying "on" while the guard cannot work is the one thing a lock app
   /// must never do.
-  bool get isOn => status.isEnabled && status.canRun;
+  bool get isOn => status.isEnabled && status.canRun && status.hasPin;
+
+  /// A PIN exists, so protection has something to authenticate against.
+  bool get hasPin => status.hasPin;
 
   /// Switched on, permitted, and the service is actually up.
   bool get isActive => status.isEnabled && status.isRunning;
@@ -116,6 +119,9 @@ class ProtectionController extends ChangeNotifier {
       );
 
       if (enabled && !status.isEnabled) {
+        if (!status.hasPin) {
+          return 'Create a PIN first, so locked apps have something to ask for.';
+        }
         return status.canRun
             ? 'Protection could not be started. Please try again.'
             : 'Samir Lock still needs permission to watch your apps and to '

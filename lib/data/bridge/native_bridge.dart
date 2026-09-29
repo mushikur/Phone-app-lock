@@ -60,6 +60,19 @@ class NativeBridge {
     return status ?? const {};
   }
 
+  Future<Map<String, Object?>> getSecurityStatus() async {
+    final status = await channel.invokeMapMethod<String, Object?>(
+      'getSecurityStatus',
+    );
+    return status ?? const {};
+  }
+
+  /// Opens the native PIN screen. The PIN itself never comes back across here.
+  Future<bool> openPinSetup() async {
+    final opened = await channel.invokeMethod<bool>('openPinSetup');
+    return opened ?? false;
+  }
+
   Future<Map<String, Object?>> setProtectionEnabled(bool enabled) async {
     final status = await channel.invokeMapMethod<String, Object?>(
       'setProtectionEnabled',

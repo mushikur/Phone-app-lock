@@ -32,6 +32,7 @@ class NativeProtectionRepository implements ProtectionRepository {
       isEnabled: raw['enabled'] as bool? ?? false,
       isRunning: raw['running'] as bool? ?? false,
       canRun: raw['canRun'] as bool? ?? false,
+      hasPin: raw['hasPin'] as bool? ?? false,
     );
   }
 

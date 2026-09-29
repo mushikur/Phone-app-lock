@@ -3,10 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:samir_lock/app.dart';
 import 'package:samir_lock/presentation/widgets/app_list_tile.dart';
 import 'package:samir_lock/presentation/widgets/protection_card.dart';
+import 'package:samir_lock/presentation/widgets/security_card.dart';
 
 import 'fakes/fake_app_inventory_repository.dart';
 import 'fakes/fake_permission_repository.dart';
 import 'fakes/fake_protection_repository.dart';
+import 'fakes/fake_security_repository.dart';
 
 void main() {
   /// The app list sits behind the permission gate, so these tests start from a
@@ -14,11 +16,13 @@ void main() {
   Widget buildApp(
     FakeAppInventoryRepository inventory, {
     FakeProtectionRepository? protection,
+    FakeSecurityRepository? security,
   }) {
     return SamirLockApp(
       inventoryRepository: inventory,
       permissionRepository: FakePermissionRepository.allGranted(),
       protectionRepository: protection ?? FakeProtectionRepository(),
+      securityRepository: security ?? FakeSecurityRepository(hasPin: true),
     );
   }
 
@@ -82,6 +86,48 @@ void main() {
     expect(find.text('Try again'), findsOneWidget);
   });
 
+  group('security card', () {
+    testWidgets('prompts for a PIN when none is set', (tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          FakeAppInventoryRepository(),
+          security: FakeSecurityRepository(hasPin: false),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No PIN yet'), findsOneWidget);
+      expect(find.text('Set up'), findsOneWidget);
+    });
+
+    testWidgets('opens the native PIN screen', (tester) async {
+      final security = FakeSecurityRepository(hasPin: false);
+
+      await tester.pumpWidget(
+        buildApp(FakeAppInventoryRepository(), security: security),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(SecurityCard.actionKey));
+      await tester.pumpAndSettle();
+
+      expect(security.pinSetupRequests, 1);
+    });
+
+    testWidgets('offers to change an existing PIN', (tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          FakeAppInventoryRepository(),
+          security: FakeSecurityRepository(hasPin: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unlock PIN'), findsOneWidget);
+      expect(find.text('Change'), findsOneWidget);
+    });
+  });
+
   group('protection card', () {
     testWidgets('starts the guard when switched on', (tester) async {
       final protection = FakeProtectionRepository();
@@ -130,6 +176,26 @@ void main() {
 
       expect(find.text('Protection is off'), findsOneWidget);
       expect(find.text('Protection is on'), findsNothing);
+    });
+
+    testWidgets('cannot be switched on without a PIN', (tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          FakeAppInventoryRepository(),
+          protection: FakeProtectionRepository(hasPin: false),
+          security: FakeSecurityRepository(hasPin: false),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final toggle = tester.widget<Switch>(
+        find.byKey(ProtectionCard.switchKey),
+      );
+      expect(toggle.onChanged, isNull);
+      expect(
+        find.text('Create a PIN above to turn protection on.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('cannot be switched on without permission', (tester) async {

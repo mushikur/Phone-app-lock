@@ -12,4 +12,30 @@
     <string name="guard_channel_description">Shows while Samir Lock is watching for locked apps.</string>
     <string name="guard_notification_title">Protection is on</string>
     <string name="guard_notification_text">Your locked apps are being watched.</string>
+
+    <string name="lock_enter_pin">Enter your PIN</string>
+    <string name="lock_use_biometric">Unlock with fingerprint</string>
+    <string name="lock_delete_digit">Delete last digit</string>
+    <string name="lock_wrong_pin">Wrong PIN. Try again.</string>
+    <string name="lock_attempts_left">Wrong PIN. %1$d attempts left.</string>
+    <string name="lock_too_many_attempts">Too many attempts. Try again in %1$s.</string>
+    <string name="lock_no_pin_title">No PIN set yet</string>
+    <string name="lock_no_pin_message">Open Samir Lock and create a PIN to protect this app.</string>
+    <string name="lock_open_samir_lock">Open Samir Lock</string>
+
+    <string name="biometric_title">Unlock</string>
+    <string name="biometric_subtitle">Confirm it is you to open this app</string>
+    <string name="biometric_use_pin">Use PIN</string>
+    <string name="biometric_locked_out">Too many attempts. Use your PIN.</string>
+    <string name="biometric_unavailable">Fingerprint is not available right now.</string>
+
+    <string name="pin_setup_create_title">Create a PIN</string>
+    <string name="pin_setup_create_subtitle">You will enter this to open your locked apps. Choose 4 to 8 digits.</string>
+    <string name="pin_setup_confirm_title">Confirm your PIN</string>
+    <string name="pin_setup_confirm_subtitle">Enter the same PIN once more.</string>
+    <string name="pin_setup_continue">Continue</string>
+    <string name="pin_setup_mismatch">Those PINs did not match. Start again.</string>
+    <string name="pin_setup_too_short">Use at least 4 digits.</string>
+    <string name="pin_setup_failed">Could not save your PIN. Please try again.</string>
+    <string name="pin_setup_saved">PIN saved</string>
 </resources>

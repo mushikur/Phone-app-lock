@@ -43,6 +43,13 @@ kotlin {
     }
 }
 
+dependencies {
+    // AndroidX BiometricPrompt: the official biometric API, and the only one that
+    // covers fingerprint below API 28 as well as the modern prompt above it.
+    // It brings androidx.fragment, which BiometricPrompt requires its host to be.
+    implementation("androidx.biometric:biometric:1.1.0")
+}
+
 flutter {
     source = "../.."
 }

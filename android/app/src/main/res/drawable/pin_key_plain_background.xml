@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Delete and biometric keys sit flat, so the digits stay the emphasis. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/lock_accent_soft">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+</ripple>
