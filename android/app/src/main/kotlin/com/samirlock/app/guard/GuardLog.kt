@@ -16,11 +16,40 @@ object GuardLog {
 
     const val TAG = "SamirLockGuard"
 
+    private const val PREFS_NAME = "samir_lock_preferences"
+    private const val KEY_DIAGNOSTICS = "diagnostics_enabled"
+
     @Volatile
     private var enabled = false
 
+    /**
+     * Turns logging on for a debuggable build, or for a release build where the
+     * user has switched diagnostics on themselves.
+     *
+     * The second case exists because a release build is otherwise silent, which
+     * leaves a problem that only happens on a real phone impossible to see. It
+     * is off unless the user asks for it, and it never logs the contents of a
+     * notification - only package names, keys and outcomes.
+     */
     fun configure(context: Context) {
-        enabled = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        val debuggable =
+            (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        enabled = debuggable || isDiagnosticsEnabled(context)
+    }
+
+    fun isDiagnosticsEnabled(context: Context): Boolean =
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_DIAGNOSTICS, false)
+
+    fun setDiagnosticsEnabled(context: Context, value: Boolean) {
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_DIAGNOSTICS, value)
+            .apply()
+        configure(context)
+        Log.i(TAG, "diagnostics ${if (value) "enabled" else "disabled"}")
     }
 
     fun d(message: String) {
@@ -29,5 +58,10 @@ object GuardLog {
 
     fun w(message: String, error: Throwable? = null) {
         if (enabled) Log.w(TAG, message, error)
+    }
+
+    /** Always logged, so a diagnostic session has a visible beginning. */
+    fun always(message: String) {
+        Log.i(TAG, message)
     }
 }

@@ -94,6 +94,14 @@ class NativeBridge {
     return opened ?? false;
   }
 
+  Future<Map<String, Object?>> setDiagnosticsEnabled(bool enabled) async {
+    final status = await channel.invokeMapMethod<String, Object?>(
+      'setDiagnosticsEnabled',
+      {'enabled': enabled},
+    );
+    return status ?? const {};
+  }
+
   Future<Map<String, Object?>> setProtectionEnabled(bool enabled) async {
     final status = await channel.invokeMapMethod<String, Object?>(
       'setProtectionEnabled',

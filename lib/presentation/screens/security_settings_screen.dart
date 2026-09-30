@@ -27,6 +27,7 @@ class SecuritySettingsScreen extends StatelessWidget {
   static const Key changePinKey = Key('change-pin-tile');
   static const Key notificationPrivacyKey = Key('notification-privacy-switch');
   static const Key notificationAccessKey = Key('notification-access-tile');
+  static const Key diagnosticsKey = Key('diagnostics-switch');
 
   Future<void> _setUpPin(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -61,6 +62,16 @@ class SecuritySettingsScreen extends StatelessWidget {
   Future<void> _openNotificationAccess(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final error = await securityController.openNotificationAccess();
+    if (error == null) return;
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error)));
+  }
+
+  Future<void> _setDiagnostics(BuildContext context, bool enabled) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await securityController.setDiagnosticsEnabled(enabled);
     if (error == null) return;
 
     messenger
@@ -258,6 +269,33 @@ class SecuritySettingsScreen extends StatelessWidget {
                           : '$missing ${missing == 1 ? 'permission needs' : 'permissions need'} '
                               'your attention.',
                       onTap: onOpenPermissions,
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SectionHeader('Troubleshooting'),
+            ListenableBuilder(
+              listenable: securityController,
+              builder: (context, _) {
+                final on = securityController.state.status.isDiagnosticsEnabled;
+                return SettingsGroup(
+                  children: [
+                    SettingsTile(
+                      icon: on ? Icons.bug_report : Icons.bug_report_outlined,
+                      title: 'Troubleshooting logs',
+                      subtitle: on
+                          ? 'Writing detailed logs. Turn this off when you are '
+                              'finished.'
+                          : 'Only turn this on if you are diagnosing a problem.',
+                      trailing: Semantics(
+                        label: 'Troubleshooting logs',
+                        child: Switch(
+                          key: diagnosticsKey,
+                          value: on,
+                          onChanged: (value) => _setDiagnostics(context, value),
+                        ),
+                      ),
                     ),
                   ],
                 );

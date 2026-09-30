@@ -57,6 +57,7 @@ class SecurityStatus {
     required this.notificationPrivacyBlocker,
     this.notificationsSeen = 0,
     this.notificationsHidden = 0,
+    this.isDiagnosticsEnabled = false,
   });
 
   const SecurityStatus.unknown()
@@ -69,7 +70,8 @@ class SecurityStatus {
         isNotificationAccessGranted = false,
         notificationPrivacyBlocker = NotificationPrivacyBlocker.noAccess,
         notificationsSeen = 0,
-        notificationsHidden = 0;
+        notificationsHidden = 0,
+        isDiagnosticsEnabled = false;
 
   final bool hasPin;
   final BiometricAvailability biometric;
@@ -104,6 +106,12 @@ class SecurityStatus {
   /// Notifications it has actually taken down and replaced.
   final int notificationsHidden;
 
+  /// Verbose logging is switched on for troubleshooting.
+  ///
+  /// A release build is otherwise silent, which leaves a problem that only
+  /// happens on a real phone impossible to see. Off unless the user asks.
+  final bool isDiagnosticsEnabled;
+
   /// Notifications from locked apps are actually being hidden right now.
   bool get isNotificationPrivacyActive =>
       notificationPrivacyBlocker == NotificationPrivacyBlocker.none;
@@ -136,6 +144,9 @@ abstract interface class SecurityRepository {
 
   /// Opens the Android screen where notification access is granted.
   Future<bool> openNotificationAccess();
+
+  /// Turns troubleshooting logs on or off, returning the resulting status.
+  Future<SecurityStatus> setDiagnosticsEnabled(bool enabled);
 }
 
 /// Raised when the native layer cannot satisfy a security request.

@@ -154,6 +154,23 @@ class SamirLockBridge(
                 result.success(opened)
             }
 
+            METHOD_SET_DIAGNOSTICS -> {
+                val enabled = call.argument<Boolean>(ARG_ENABLED)
+                if (enabled == null) {
+                    result.error(
+                        ERROR_INVALID_ARGUMENTS,
+                        "setDiagnosticsEnabled requires an enabled flag.",
+                        null,
+                    )
+                    return
+                }
+                GuardLog.setDiagnosticsEnabled(appContext, enabled)
+                if (enabled) {
+                    GuardLog.always("diagnostics on - reproduce the problem now")
+                }
+                result.success(securityStatus())
+            }
+
             METHOD_SET_BIOMETRIC_ENABLED -> {
                 val enabled = call.argument<Boolean>(ARG_ENABLED)
                 if (enabled == null) {
@@ -317,6 +334,7 @@ class SamirLockBridge(
         // Counts and reason codes only, so the settings screen can report what
         // the listener is actually doing on a build that logs nothing.
         KEY_NOTIFICATION_DIAGNOSTICS to NotificationPrivacyState.diagnostics(),
+        KEY_DIAGNOSTICS_ENABLED to GuardLog.isDiagnosticsEnabled(appContext),
     )
 
     private fun setProtectionEnabled(enabled: Boolean): Map<String, Any?> {
@@ -370,6 +388,7 @@ class SamirLockBridge(
         const val METHOD_GET_SECURITY_STATUS = "getSecurityStatus"
         const val METHOD_OPEN_PIN_SETUP = "openPinSetup"
         const val METHOD_SET_BIOMETRIC_ENABLED = "setBiometricEnabled"
+        const val METHOD_SET_DIAGNOSTICS = "setDiagnosticsEnabled"
         const val METHOD_SET_NOTIFICATION_PRIVACY = "setNotificationPrivacyEnabled"
         const val METHOD_OPEN_NOTIFICATION_ACCESS = "openNotificationAccess"
 
@@ -390,6 +409,7 @@ class SamirLockBridge(
         const val KEY_NOTIFICATION_ACCESS = "notificationAccessGranted"
         const val KEY_NOTIFICATION_BLOCKER = "notificationPrivacyBlocker"
         const val KEY_NOTIFICATION_DIAGNOSTICS = "notificationPrivacyDiagnostics"
+        const val KEY_DIAGNOSTICS_ENABLED = "diagnosticsEnabled"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"

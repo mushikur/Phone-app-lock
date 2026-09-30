@@ -45,6 +45,15 @@ class NativeSecurityRepository implements SecurityRepository {
     );
   }
 
+  @override
+  Future<SecurityStatus> setDiagnosticsEnabled(bool enabled) async {
+    final raw = await _guard(
+      () => _bridge.setDiagnosticsEnabled(enabled),
+      'Could not change troubleshooting logs.',
+    );
+    return _toStatus(raw);
+  }
+
   SecurityStatus _toStatus(Map<String, Object?> raw) {
     final diagnostics =
         (raw['notificationPrivacyDiagnostics'] as Map?)?.cast<Object?, Object?>();
@@ -64,6 +73,7 @@ class NativeSecurityRepository implements SecurityRepository {
       ),
       notificationsSeen: diagnostics?['seen'] as int? ?? 0,
       notificationsHidden: diagnostics?['hidden'] as int? ?? 0,
+      isDiagnosticsEnabled: raw['diagnosticsEnabled'] as bool? ?? false,
     );
   }
 

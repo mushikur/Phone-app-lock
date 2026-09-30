@@ -43,6 +43,10 @@ class FakeSecurityRepository implements SecurityRepository {
 
   int notificationAccessRequests = 0;
 
+  /// Every requested diagnostics change, in order.
+  final List<bool> diagnosticsCalls = [];
+  bool isDiagnosticsEnabled = false;
+
   @override
   Future<SecurityStatus> loadStatus() async {
     if (failOnLoad) {
@@ -78,6 +82,13 @@ class FakeSecurityRepository implements SecurityRepository {
     return true;
   }
 
+  @override
+  Future<SecurityStatus> setDiagnosticsEnabled(bool enabled) async {
+    diagnosticsCalls.add(enabled);
+    isDiagnosticsEnabled = enabled;
+    return _status();
+  }
+
   /// Mirrors the native precondition order.
   NotificationPrivacyBlocker get _blocker {
     if (!isNotificationAccessGranted) return NotificationPrivacyBlocker.noAccess;
@@ -96,6 +107,7 @@ class FakeSecurityRepository implements SecurityRepository {
         isNotificationPrivacyEnabled: isNotificationPrivacyEnabled,
         isNotificationAccessGranted: isNotificationAccessGranted,
         notificationPrivacyBlocker: _blocker,
+        isDiagnosticsEnabled: isDiagnosticsEnabled,
       );
 
   @override

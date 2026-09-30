@@ -437,6 +437,22 @@ void main() {
       expect(find.textContaining('Active.'), findsOneWidget);
     });
 
+    testWidgets('troubleshooting logs can be switched on', (tester) async {
+      useTallSurface(tester);
+      final security = FakeSecurityRepository(hasPin: true);
+
+      await tester.pumpWidget(buildApp(security: security));
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      await tester.tap(find.byKey(SecuritySettingsScreen.diagnosticsKey));
+      await tester.pumpAndSettle();
+
+      expect(security.diagnosticsCalls, [true]);
+      expect(find.textContaining('Turn this off when you are finished'),
+          findsOneWidget);
+    });
+
     testWidgets('explains the wrong-PIN protection', (tester) async {
       useTallSurface(tester);
       await tester.pumpWidget(

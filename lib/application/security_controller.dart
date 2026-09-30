@@ -151,6 +151,24 @@ class SecurityController extends ChangeNotifier {
     }
   }
 
+  /// Turns troubleshooting logs on or off.
+  Future<String?> setDiagnosticsEnabled(bool enabled) async {
+    try {
+      final status = await _repository.setDiagnosticsEnabled(enabled);
+      _emit(
+        _state.copyWith(
+          loadStatus: SecurityLoadStatus.ready,
+          status: status,
+          clearError: true,
+        ),
+      );
+      return null;
+    } on SecurityException catch (error) {
+      _emit(_state.copyWith(errorMessage: error.message));
+      return error.message;
+    }
+  }
+
   void _emit(SecurityState next) {
     _state = next;
     notifyListeners();
