@@ -66,6 +66,22 @@ object NotificationPrivacyState {
 
     fun isActive(context: Context): Boolean = blocker(context) == Blocker.NONE
 
+    /**
+     * The same question, minus the notification-access check, for use inside the
+     * listener itself.
+     *
+     * Reading that setting means a ContentResolver call, and it sits in front of
+     * every cancellation. It is also redundant there: the listener only receives
+     * a callback at all while it is connected, and it is only connected while
+     * access is granted. The remaining checks are in-memory preference reads.
+     */
+    fun isActiveForListener(context: Context): Boolean {
+        val preferences = GuardPreferences(context)
+        if (!preferences.isNotificationPrivacyEnabled) return false
+        if (!preferences.isProtectionEnabled) return false
+        return LockedAppsStore(context).lockedPackages().isNotEmpty()
+    }
+
     /** Counts and reason codes for the settings screen. Never any content. */
     fun diagnostics(): Map<String, Any?> = mapOf(
         "seen" to seen.get(),

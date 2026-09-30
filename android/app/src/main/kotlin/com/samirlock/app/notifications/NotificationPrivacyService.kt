@@ -90,17 +90,39 @@ class NotificationPrivacyService : NotificationListenerService() {
             return
         }
 
-        val known = hiddenKeys[notification.packageName]?.contains(notification.key) == true
+        // Cancel before anything else. Android displays a notification before it
+        // tells the listener, so every microsecond spent here is time the content
+        // is on screen. Logging, the group sweep, the stand-in and the
+        // verification all happen afterwards.
+        val key = notification.key
+        cancelAll(arrayOf(key))
+
+        afterCancel(notification, key)
+    }
+
+    /**
+     * Everything that does not have to happen before the cancel.
+     *
+     * Deliberately separated so the hot path above stays down to a handful of
+     * in-memory reads and one binder call.
+     */
+    private fun afterCancel(notification: StatusBarNotification, key: String) {
+        val packageName = notification.packageName
+        val known = hiddenKeys[packageName]?.contains(key) == true
+
         GuardLog.d(
-            "privacy: posted pkg=${notification.packageName} key=${notification.key} " +
-                "sameKeyAsBefore=$known " +
+            "privacy: posted pkg=$packageName key=$key sameKeyAsBefore=$known " +
                 "group=${notification.notification?.group} " +
                 "isGroupSummary=${isGroupSummary(notification)} " +
-                "activeForPkg=${activeFor(notification.packageName).size} " +
                 "ongoing=${notification.isOngoing} clearable=${notification.isClearable}",
         )
 
-        hide(notification.packageName, notification.key, notification.notification?.contentIntent)
+        hide(
+            packageName = packageName,
+            key = key,
+            contentIntent = notification.notification?.contentIntent,
+            alreadyCancelled = true,
+        )
     }
 
     /**
@@ -133,17 +155,27 @@ class NotificationPrivacyService : NotificationListenerService() {
      * summary carries the same sender and text. Cancelling only the child would
      * leave the content on display in the summary.
      */
-    private fun hide(packageName: String, key: String?, contentIntent: PendingIntent?) {
+    private fun hide(
+        packageName: String,
+        key: String?,
+        contentIntent: PendingIntent?,
+        alreadyCancelled: Boolean = false,
+    ) {
         val attempted = linkedSetOf<String>()
+        val outstanding = linkedSetOf<String>()
         var tapAction = contentIntent
 
-        if (key != null) attempted += key
+        if (key != null) {
+            attempted += key
+            if (!alreadyCancelled) outstanding += key
+        }
 
         for (active in activeFor(packageName)) {
             if (active.key == key) continue
             if (!isHideable(active)) continue
             if (tapAction == null) tapAction = active.notification?.contentIntent
             attempted += active.key
+            outstanding += active.key
         }
 
         if (attempted.isEmpty()) return
@@ -151,7 +183,7 @@ class NotificationPrivacyService : NotificationListenerService() {
         // One call rather than one per key. Cancelling a group's children and
         // its summary separately leaves a gap in which the system can rebuild
         // the summary from what is still there.
-        cancelAll(attempted.toTypedArray())
+        if (outstanding.isNotEmpty()) cancelAll(outstanding.toTypedArray())
         GuardLog.d("privacy: asked to cancel ${attempted.size} from $packageName $attempted")
 
         val keys = hiddenKeys.getOrPut(packageName) { ConcurrentHashMap.newKeySet() }
@@ -276,7 +308,9 @@ class NotificationPrivacyService : NotificationListenerService() {
             return NotificationPrivacyState.Skip.ALREADY_UNLOCKED
         }
 
-        if (!NotificationPrivacyState.isActive(this)) {
+        // Deliberately the listener-side check: the access query it leaves out
+        // is a ContentResolver call, and it would sit in front of every cancel.
+        if (!NotificationPrivacyState.isActiveForListener(this)) {
             return NotificationPrivacyState.Skip.NOT_ACTIVE
         }
 
