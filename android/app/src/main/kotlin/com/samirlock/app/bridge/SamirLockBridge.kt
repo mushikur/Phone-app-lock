@@ -21,6 +21,7 @@ import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.GuardServiceController
 import com.samirlock.app.inventory.InstalledAppsProvider
+import com.samirlock.app.permissions.DeviceCompatibility
 import com.samirlock.app.permissions.PermissionChecker
 import com.samirlock.app.permissions.PermissionIds
 import com.samirlock.app.permissions.PermissionSettingsLauncher
@@ -158,6 +159,9 @@ class SamirLockBridge(
             }
 
             METHOD_GET_POPUP_WARNINGS -> result.success(popupWarnings())
+
+            METHOD_GET_DEVICE_COMPATIBILITY ->
+                result.success(DeviceCompatibility.describe(appContext))
 
             METHOD_OPEN_CHANNEL_SETTINGS -> {
                 val packageName = call.argument<String>(ARG_PACKAGE_NAME)
@@ -440,6 +444,7 @@ class SamirLockBridge(
         const val METHOD_SET_BIOMETRIC_ENABLED = "setBiometricEnabled"
         const val METHOD_SET_DIAGNOSTICS = "setDiagnosticsEnabled"
         const val METHOD_GET_POPUP_WARNINGS = "getPopupWarnings"
+        const val METHOD_GET_DEVICE_COMPATIBILITY = "getDeviceCompatibility"
         const val METHOD_OPEN_CHANNEL_SETTINGS = "openChannelSettings"
         const val METHOD_SET_NOTIFICATION_PRIVACY = "setNotificationPrivacyEnabled"
         const val METHOD_OPEN_NOTIFICATION_ACCESS = "openNotificationAccess"

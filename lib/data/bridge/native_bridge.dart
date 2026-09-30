@@ -120,6 +120,13 @@ class NativeBridge {
     return opened ?? false;
   }
 
+  Future<Map<String, Object?>> getDeviceCompatibility() async {
+    final info = await channel.invokeMapMethod<String, Object?>(
+      'getDeviceCompatibility',
+    );
+    return info ?? const {};
+  }
+
   Future<Map<String, Object?>> setProtectionEnabled(bool enabled) async {
     final status = await channel.invokeMapMethod<String, Object?>(
       'setProtectionEnabled',

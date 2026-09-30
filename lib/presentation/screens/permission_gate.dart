@@ -4,8 +4,9 @@ import '../../application/app_list_controller.dart';
 import '../../application/permissions_controller.dart';
 import '../../application/protection_controller.dart';
 import '../../application/security_controller.dart';
+import '../../application/setup_controller.dart';
 import 'main_shell.dart';
-import 'permissions_screen.dart';
+import 'setup_screen.dart';
 
 /// Decides whether to show onboarding or the app list.
 ///
@@ -22,12 +23,14 @@ class PermissionGate extends StatefulWidget {
     required this.appListController,
     required this.protectionController,
     required this.securityController,
+    required this.setupController,
   });
 
   final PermissionsController permissionsController;
   final AppListController appListController;
   final ProtectionController protectionController;
   final SecurityController securityController;
+  final SetupController setupController;
 
   @override
   State<PermissionGate> createState() => _PermissionGateState();
@@ -73,10 +76,14 @@ class _PermissionGateState extends State<PermissionGate> {
               protectionController: widget.protectionController,
               securityController: widget.securityController,
               permissionsController: widget.permissionsController,
+              setupController: widget.setupController,
             )
-          : PermissionsScreen(
-              key: const ValueKey('permissions'),
-              controller: widget.permissionsController,
+          : SetupScreen(
+              key: const ValueKey('setup'),
+              setupController: widget.setupController,
+              permissionsController: widget.permissionsController,
+              securityController: widget.securityController,
+              isFirstRun: true,
               onContinue: () => setState(() => _showHome = true),
             ),
     );

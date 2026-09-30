@@ -4,11 +4,12 @@ import '../../application/app_list_controller.dart';
 import '../../application/permissions_controller.dart';
 import '../../application/protection_controller.dart';
 import '../../application/security_controller.dart';
+import '../../application/setup_controller.dart';
 import '../widgets/app_background.dart';
 import 'apps_screen.dart';
 import 'dashboard_screen.dart';
-import 'permissions_screen.dart';
 import 'security_settings_screen.dart';
+import 'setup_screen.dart';
 
 /// The three tabs of the app, and the state they share.
 ///
@@ -22,12 +23,14 @@ class MainShell extends StatefulWidget {
     required this.protectionController,
     required this.securityController,
     required this.permissionsController,
+    required this.setupController,
   });
 
   final AppListController appListController;
   final ProtectionController protectionController;
   final SecurityController securityController;
   final PermissionsController permissionsController;
+  final SetupController setupController;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -52,6 +55,7 @@ class _MainShellState extends State<MainShell> {
         widget.protectionController.refresh(showSpinner: false);
         widget.securityController.refresh(showSpinner: false);
         widget.permissionsController.refresh(showSpinner: false);
+        widget.setupController.refresh(showSpinner: false);
       },
     );
   }
@@ -67,8 +71,11 @@ class _MainShellState extends State<MainShell> {
   Future<void> _openPermissions() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => PermissionsScreen(
-          controller: widget.permissionsController,
+        builder: (context) => SetupScreen(
+          setupController: widget.setupController,
+          permissionsController: widget.permissionsController,
+          securityController: widget.securityController,
+          isFirstRun: false,
           onContinue: () => Navigator.of(context).pop(),
         ),
       ),

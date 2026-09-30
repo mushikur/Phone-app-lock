@@ -7,6 +7,7 @@ import 'package:samir_lock/presentation/widgets/app_list_tile.dart';
 import 'package:samir_lock/presentation/widgets/status_hero_card.dart';
 
 import 'fakes/fake_app_inventory_repository.dart';
+import 'fakes/fake_device_repository.dart';
 import 'fakes/fake_permission_repository.dart';
 import 'fakes/fake_protection_repository.dart';
 import 'fakes/fake_security_repository.dart';
@@ -32,6 +33,7 @@ void main() {
       permissionRepository: FakePermissionRepository.allGranted(),
       protectionRepository: protection ?? FakeProtectionRepository(),
       securityRepository: security ?? FakeSecurityRepository(hasPin: true),
+      deviceRepository: FakeDeviceRepository(),
     );
   }
 
