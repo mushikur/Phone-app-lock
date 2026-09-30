@@ -116,6 +116,10 @@ object NotificationPrivacy {
             .setContentTitle(appName)
             .setContentText(text)
             .setAutoCancel(true)
+            // Re-posted whenever the hidden set changes, so it must not buzz or
+            // peek again each time. Without this the stand-in adds to the very
+            // churn it is meant to replace.
+            .setOnlyAlertOnce(true)
             // Safe to show on the lock screen: the title is the app's own name
             // and the text is a fixed string of ours. Nothing from the original
             // notification is in here. Hiding it entirely would leave the user

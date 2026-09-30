@@ -90,10 +90,13 @@ class NotificationPrivacyService : NotificationListenerService() {
             return
         }
 
+        val known = hiddenKeys[notification.packageName]?.contains(notification.key) == true
         GuardLog.d(
             "privacy: posted pkg=${notification.packageName} key=${notification.key} " +
+                "sameKeyAsBefore=$known " +
                 "group=${notification.notification?.group} " +
                 "isGroupSummary=${isGroupSummary(notification)} " +
+                "activeForPkg=${activeFor(notification.packageName).size} " +
                 "ongoing=${notification.isOngoing} clearable=${notification.isClearable}",
         )
 
@@ -131,33 +134,39 @@ class NotificationPrivacyService : NotificationListenerService() {
      * leave the content on display in the summary.
      */
     private fun hide(packageName: String, key: String?, contentIntent: PendingIntent?) {
-        val attempted = mutableListOf<String>()
+        val attempted = linkedSetOf<String>()
         var tapAction = contentIntent
 
-        if (key != null) {
-            cancel(key)
-            attempted += key
-        }
+        if (key != null) attempted += key
 
         for (active in activeFor(packageName)) {
             if (active.key == key) continue
             if (!isHideable(active)) continue
             if (tapAction == null) tapAction = active.notification?.contentIntent
-            cancel(active.key)
             attempted += active.key
         }
 
-        GuardLog.d("privacy: asked to cancel ${attempted.size} from $packageName")
+        if (attempted.isEmpty()) return
+
+        // One call rather than one per key. Cancelling a group's children and
+        // its summary separately leaves a gap in which the system can rebuild
+        // the summary from what is still there.
+        cancelAll(attempted.toTypedArray())
+        GuardLog.d("privacy: asked to cancel ${attempted.size} from $packageName $attempted")
 
         val keys = hiddenKeys.getOrPut(packageName) { ConcurrentHashMap.newKeySet() }
         val fresh = attempted.count(keys::add)
 
-        postPlaceholder(packageName, keys.size, tapAction)
-        if (fresh > 0) NotificationPrivacyState.recordHidden(fresh)
+        // Only when the set actually grew. Re-posting an unchanged stand-in on
+        // every repost cycle is churn the user sees.
+        if (fresh > 0) {
+            postPlaceholder(packageName, keys.size, tapAction)
+            NotificationPrivacyState.recordHidden(fresh)
+        } else {
+            GuardLog.d("privacy: repost of a key already hidden, stand-in left alone")
+        }
 
-        // cancelNotification returns nothing and does not throw when it has no
-        // effect, so whether it worked can only be learned by looking again.
-        verifyCancelled(packageName, attempted)
+        verifyCancelled(packageName, attempted.toList())
     }
 
     /**
@@ -237,10 +246,12 @@ class NotificationPrivacyService : NotificationListenerService() {
             .orEmpty()
             .filter { it.packageName == packageName }
 
-    private fun cancel(key: String) {
-        runCatching { cancelNotification(key) }
-            .onFailure { GuardLog.w("privacy: cancelNotification threw for $key", it) }
+    private fun cancelAll(keys: Array<String>) {
+        runCatching { cancelNotifications(keys) }
+            .onFailure { GuardLog.w("privacy: cancelNotifications threw", it) }
     }
+
+    private fun cancel(key: String) = cancelAll(arrayOf(key))
 
     /**
      * Why this notification is being left alone, or null when it should be hidden.
