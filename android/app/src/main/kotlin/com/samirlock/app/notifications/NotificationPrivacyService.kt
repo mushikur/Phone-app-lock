@@ -27,8 +27,14 @@ class NotificationPrivacyService : NotificationListenerService() {
 
     private lateinit var lockedAppsStore: LockedAppsStore
 
-    /** How many notifications are currently hidden per package. */
-    private val hiddenCounts = ConcurrentHashMap<String, Int>()
+    /**
+     * The notification keys currently hidden, per package.
+     *
+     * Keys rather than a running total: apps re-post a notification whenever
+     * they update it, and counting every re-post would have the stand-in
+     * claiming five new messages when one arrived five times.
+     */
+    private val hiddenKeys = ConcurrentHashMap<String, MutableSet<String>>()
 
     override fun onCreate() {
         super.onCreate()
@@ -51,7 +57,7 @@ class NotificationPrivacyService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         instance = null
-        hiddenCounts.clear()
+        hiddenKeys.clear()
         GuardLog.d("privacy: listener disconnected")
         super.onListenerDisconnected()
     }
@@ -90,19 +96,19 @@ class NotificationPrivacyService : NotificationListenerService() {
      * feature exists to prevent.
      */
     private fun hide(packageName: String, key: String?, contentIntent: PendingIntent?) {
-        var cancelled = 0
+        val taken = mutableListOf<String>()
         var tapAction = contentIntent
 
-        if (key != null && cancel(key)) cancelled++
+        if (key != null && cancel(key)) taken += key
 
         for (active in activeFor(packageName)) {
             if (active.key == key) continue
             if (!isHideable(active)) continue
             if (tapAction == null) tapAction = active.notification?.contentIntent
-            if (cancel(active.key)) cancelled++
+            if (cancel(active.key)) taken += active.key
         }
 
-        if (cancelled == 0) {
+        if (taken.isEmpty()) {
             // Nothing came down, so posting a stand-in would only add noise on
             // top of content that is still showing.
             NotificationPrivacyState.recordCancelFailed()
@@ -110,12 +116,14 @@ class NotificationPrivacyService : NotificationListenerService() {
             return
         }
 
-        val count = hiddenCounts.merge(packageName, cancelled, Int::plus) ?: cancelled
-        postPlaceholder(packageName, count, tapAction)
-        NotificationPrivacyState.recordHidden(cancelled)
+        val keys = hiddenKeys.getOrPut(packageName) { ConcurrentHashMap.newKeySet() }
+        val fresh = taken.count(keys::add)
+
+        postPlaceholder(packageName, keys.size, tapAction)
+        if (fresh > 0) NotificationPrivacyState.recordHidden(fresh)
 
         // The package name only. What the notification said is never logged.
-        GuardLog.d("privacy: hid $cancelled from $packageName (now $count)")
+        GuardLog.d("privacy: hid ${taken.size} from $packageName (${keys.size} held)")
     }
 
     private fun postPlaceholder(packageName: String, count: Int, tapAction: PendingIntent?) {
@@ -158,14 +166,16 @@ class NotificationPrivacyService : NotificationListenerService() {
      * Why this notification is being left alone, or null when it should be hidden.
      */
     private fun skipReason(sbn: StatusBarNotification): NotificationPrivacyState.Skip? {
-        // One source of truth with the settings screen: whatever it tells the
-        // user is blocking hiding is exactly what is checked here.
-        if (!NotificationPrivacyState.isActive(this)) {
-            return NotificationPrivacyState.Skip.NOT_ACTIVE
-        }
-
+        // Cheapest checks first. This runs for every notification on the device,
+        // from every app, and the active check reads a system setting - work
+        // worth doing only once a notification is a candidate.
         val packageName = sbn.packageName ?: return NotificationPrivacyState.Skip.NOT_ACTIVE
         if (packageName == this.packageName) return NotificationPrivacyState.Skip.OWN_APP
+
+        // Ongoing notifications are things like a music player or a call. Taking
+        // those down would break the app rather than protect the user.
+        if (!isHideable(sbn)) return NotificationPrivacyState.Skip.ONGOING
+
         if (packageName !in lockedAppsStore.lockedPackages()) {
             return NotificationPrivacyState.Skip.NOT_LOCKED
         }
@@ -175,9 +185,11 @@ class NotificationPrivacyService : NotificationListenerService() {
             return NotificationPrivacyState.Skip.ALREADY_UNLOCKED
         }
 
-        // Ongoing notifications are things like a music player or a call. Taking
-        // those down would break the app rather than protect the user.
-        if (!isHideable(sbn)) return NotificationPrivacyState.Skip.ONGOING
+        // One source of truth with the settings screen: whatever it tells the
+        // user is blocking hiding is exactly what is checked here.
+        if (!NotificationPrivacyState.isActive(this)) {
+            return NotificationPrivacyState.Skip.NOT_ACTIVE
+        }
 
         return null
     }
@@ -201,7 +213,7 @@ class NotificationPrivacyService : NotificationListenerService() {
          */
         fun onPackageUnlocked(packageName: String) {
             val service = instance ?: return
-            service.hiddenCounts.remove(packageName)
+            service.hiddenKeys.remove(packageName)
             NotificationPrivacy.cancelPlaceholder(service, packageName)
         }
     }

@@ -116,9 +116,11 @@ object NotificationPrivacy {
             .setContentTitle(appName)
             .setContentText(text)
             .setAutoCancel(true)
-            // Nothing sensitive is in here, but the lock screen should show even
-            // less than the shade does.
-            .setVisibility(Notification.VISIBILITY_SECRET)
+            // Safe to show on the lock screen: the title is the app's own name
+            // and the text is a fixed string of ours. Nothing from the original
+            // notification is in here. Hiding it entirely would leave the user
+            // with no sign that anything arrived.
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
             .apply { originalIntent?.let(::setContentIntent) }
             .build()
     }
