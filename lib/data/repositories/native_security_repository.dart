@@ -54,6 +54,39 @@ class NativeSecurityRepository implements SecurityRepository {
     return _toStatus(raw);
   }
 
+  @override
+  Future<List<PopupWarning>> loadPopupWarnings() async {
+    final raw = await _guard(
+      _bridge.getPopupWarnings,
+      'Could not check notification pop-up settings.',
+    );
+
+    return raw
+        .map(
+          (entry) => PopupWarning(
+            packageName: entry['packageName'] as String? ?? '',
+            appName: entry['appName'] as String? ?? '',
+            channelId: entry['channelId'] as String? ?? '',
+          ),
+        )
+        .where((warning) => warning.packageName.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<bool> openChannelSettings({
+    required String packageName,
+    required String channelId,
+  }) {
+    return _guard(
+      () => _bridge.openChannelSettings(
+        packageName: packageName,
+        channelId: channelId,
+      ),
+      'Could not open notification settings for that app.',
+    );
+  }
+
   SecurityStatus _toStatus(Map<String, Object?> raw) {
     final diagnostics =
         (raw['notificationPrivacyDiagnostics'] as Map?)?.cast<Object?, Object?>();

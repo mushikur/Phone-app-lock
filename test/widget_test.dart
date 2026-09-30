@@ -437,6 +437,78 @@ void main() {
       expect(find.textContaining('Active.'), findsOneWidget);
     });
 
+    testWidgets('warns when a locked app can still show pop-ups', (
+      tester,
+    ) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        buildApp(
+          security: FakeSecurityRepository(
+            hasPin: true,
+            isNotificationPrivacyEnabled: true,
+            popupWarnings: const [
+              PopupWarning(
+                packageName: 'com.example.chat',
+                appName: 'Chat',
+                channelId: 'messages',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      expect(find.text('Message pop-ups still show content'), findsOneWidget);
+      // It must never imply Samir Lock can do this itself.
+      expect(find.textContaining('Android does not allow it'), findsOneWidget);
+      // And the sound trade-off has to be stated up front.
+      expect(find.textContaining('removes its sound'), findsOneWidget);
+      expect(find.text('Disable pop-ups for Chat'), findsOneWidget);
+    });
+
+    testWidgets('the pop-up button opens that app settings page', (
+      tester,
+    ) async {
+      useTallSurface(tester);
+      final security = FakeSecurityRepository(
+        hasPin: true,
+        isNotificationPrivacyEnabled: true,
+        popupWarnings: const [
+          PopupWarning(
+            packageName: 'com.example.chat',
+            appName: 'Chat',
+            channelId: 'messages',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(buildApp(security: security));
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      await tester.tap(find.byKey(SecuritySettingsScreen.popupWarningKey));
+      await tester.pumpAndSettle();
+
+      expect(security.channelSettingsOpened, ['com.example.chat']);
+    });
+
+    testWidgets('no warning when nothing can pop up', (tester) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        buildApp(
+          security: FakeSecurityRepository(
+            hasPin: true,
+            isNotificationPrivacyEnabled: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await goToTab(tester, 'Security');
+
+      expect(find.textContaining('still show content'), findsNothing);
+    });
+
     testWidgets('troubleshooting logs can be switched on', (tester) async {
       useTallSurface(tester);
       final security = FakeSecurityRepository(hasPin: true);

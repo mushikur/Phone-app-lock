@@ -12,11 +12,15 @@ class SecurityState {
     this.loadStatus = SecurityLoadStatus.loading,
     this.status = const SecurityStatus.unknown(),
     this.errorMessage,
+    this.popupWarnings = const [],
   });
 
   final SecurityLoadStatus loadStatus;
   final SecurityStatus status;
   final String? errorMessage;
+
+  /// Locked apps that can still show notification pop-ups.
+  final List<PopupWarning> popupWarnings;
 
   bool get hasPin => status.hasPin;
 
@@ -28,12 +32,14 @@ class SecurityState {
     SecurityLoadStatus? loadStatus,
     SecurityStatus? status,
     String? errorMessage,
+    List<PopupWarning>? popupWarnings,
     bool clearError = false,
   }) {
     return SecurityState(
       loadStatus: loadStatus ?? this.loadStatus,
       status: status ?? this.status,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      popupWarnings: popupWarnings ?? this.popupWarnings,
     );
   }
 }
@@ -65,10 +71,14 @@ class SecurityController extends ChangeNotifier {
 
     try {
       final status = await _repository.loadStatus();
+      // Which apps can still pop up is read alongside the rest, so returning
+      // from Android settings refreshes it.
+      final warnings = await _repository.loadPopupWarnings();
       _emit(
         _state.copyWith(
           loadStatus: SecurityLoadStatus.ready,
           status: status,
+          popupWarnings: warnings,
           clearError: true,
         ),
       );
@@ -165,6 +175,23 @@ class SecurityController extends ChangeNotifier {
       return null;
     } on SecurityException catch (error) {
       _emit(_state.copyWith(errorMessage: error.message));
+      return error.message;
+    }
+  }
+
+  /// Opens the Android page where an app's pop-ups can be turned off.
+  ///
+  /// Returns a message to show the user on failure, or null on success.
+  Future<String?> openChannelSettings(PopupWarning warning) async {
+    try {
+      final opened = await _repository.openChannelSettings(
+        packageName: warning.packageName,
+        channelId: warning.channelId,
+      );
+      return opened
+          ? null
+          : 'Could not open notification settings for ${warning.appName}.';
+    } on SecurityException catch (error) {
       return error.message;
     }
   }

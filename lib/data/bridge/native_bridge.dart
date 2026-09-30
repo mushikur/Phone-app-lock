@@ -102,6 +102,24 @@ class NativeBridge {
     return status ?? const {};
   }
 
+  Future<List<Map<Object?, Object?>>> getPopupWarnings() async {
+    final warnings = await channel.invokeListMethod<Map<Object?, Object?>>(
+      'getPopupWarnings',
+    );
+    return warnings ?? const [];
+  }
+
+  Future<bool> openChannelSettings({
+    required String packageName,
+    required String channelId,
+  }) async {
+    final opened = await channel.invokeMethod<bool>('openChannelSettings', {
+      'packageName': packageName,
+      'channelId': channelId,
+    });
+    return opened ?? false;
+  }
+
   Future<Map<String, Object?>> setProtectionEnabled(bool enabled) async {
     final status = await channel.invokeMapMethod<String, Object?>(
       'setProtectionEnabled',

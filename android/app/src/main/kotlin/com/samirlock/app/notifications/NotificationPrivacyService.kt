@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
 class NotificationPrivacyService : NotificationListenerService() {
 
     private lateinit var lockedAppsStore: LockedAppsStore
+    private lateinit var popupChannels: PopupChannelStore
     private val handler = Handler(Looper.getMainLooper())
 
     /**
@@ -42,6 +43,7 @@ class NotificationPrivacyService : NotificationListenerService() {
         super.onCreate()
         GuardLog.configure(this)
         lockedAppsStore = LockedAppsStore(this)
+        popupChannels = PopupChannelStore(this)
         NotificationPrivacy.ensureChannel(this)
     }
 
@@ -97,7 +99,7 @@ class NotificationPrivacyService : NotificationListenerService() {
         val key = notification.key
         cancelAll(arrayOf(key))
 
-        afterCancel(notification, key)
+        afterCancel(notification, key, rankingMap)
     }
 
     /**
@@ -106,9 +108,19 @@ class NotificationPrivacyService : NotificationListenerService() {
      * Deliberately separated so the hot path above stays down to a handful of
      * in-memory reads and one binder call.
      */
-    private fun afterCancel(notification: StatusBarNotification, key: String) {
+    private fun afterCancel(
+        notification: StatusBarNotification,
+        key: String,
+        rankingMap: RankingMap?,
+    ) {
         val packageName = notification.packageName
         val known = hiddenKeys[packageName]?.contains(key) == true
+
+        // Which channel this arrived on, and whether the system still lets that
+        // channel interrupt with a pop-up. This is the only way to know: a
+        // listener cannot read another app's channels, but it can read the
+        // ranking of a notification it was handed.
+        recordChannel(notification, key, rankingMap)
 
         GuardLog.d(
             "privacy: posted pkg=$packageName key=$key sameKeyAsBefore=$known " +
@@ -256,6 +268,19 @@ class NotificationPrivacyService : NotificationListenerService() {
         runCatching {
             manager?.notify(NotificationPrivacy.notificationIdFor(packageName), placeholder)
         }.onFailure { GuardLog.w("privacy: could not post the stand-in", it) }
+    }
+
+    private fun recordChannel(
+        notification: StatusBarNotification,
+        key: String,
+        rankingMap: RankingMap?,
+    ) {
+        val channelId = notification.notification?.channelId ?: return
+        val ranking = Ranking()
+        val known = rankingMap?.getRanking(key, ranking) == true
+        if (!known) return
+
+        popupChannels.record(notification.packageName, channelId, ranking.importance)
     }
 
     /** Hides anything already on screen for apps that are locked right now. */

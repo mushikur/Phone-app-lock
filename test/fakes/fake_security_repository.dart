@@ -17,6 +17,7 @@ class FakeSecurityRepository implements SecurityRepository {
     this.failOnLoad = false,
     this.pinSetupOpens = true,
     this.failOnWrite = false,
+    this.popupWarnings = const [],
   });
 
   bool hasPin;
@@ -32,6 +33,9 @@ class FakeSecurityRepository implements SecurityRepository {
   final bool failOnLoad;
   final bool pinSetupOpens;
   final bool failOnWrite;
+
+  /// Locked apps the native layer reports as still able to pop up.
+  final List<PopupWarning> popupWarnings;
 
   int pinSetupRequests = 0;
 
@@ -87,6 +91,21 @@ class FakeSecurityRepository implements SecurityRepository {
     diagnosticsCalls.add(enabled);
     isDiagnosticsEnabled = enabled;
     return _status();
+  }
+
+  /// Every channel settings page opened, in order.
+  final List<String> channelSettingsOpened = [];
+
+  @override
+  Future<List<PopupWarning>> loadPopupWarnings() async => popupWarnings;
+
+  @override
+  Future<bool> openChannelSettings({
+    required String packageName,
+    required String channelId,
+  }) async {
+    channelSettingsOpened.add(packageName);
+    return true;
   }
 
   /// Mirrors the native precondition order.

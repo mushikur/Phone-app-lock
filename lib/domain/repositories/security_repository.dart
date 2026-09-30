@@ -41,6 +41,25 @@ enum NotificationPrivacyBlocker {
   }
 }
 
+/// A locked app whose notification channel can still show a pop-up.
+///
+/// Samir Lock cannot turn that off — changing another app's notification
+/// settings needs a system permission no installable app can hold — so this
+/// exists to name the app and open the right settings page.
+class PopupWarning {
+  const PopupWarning({
+    required this.packageName,
+    required this.appName,
+    required this.channelId,
+  });
+
+  final String packageName;
+  final String appName;
+
+  /// The channel the app posts on, used to deep link to its settings.
+  final String channelId;
+}
+
 /// What the Flutter layer is allowed to know about authentication.
 ///
 /// Deliberately only two facts. The PIN, its hash and the decision to release a
@@ -147,6 +166,20 @@ abstract interface class SecurityRepository {
 
   /// Turns troubleshooting logs on or off, returning the resulting status.
   Future<SecurityStatus> setDiagnosticsEnabled(bool enabled);
+
+  /// Locked apps that can still show notification pop-ups.
+  ///
+  /// Refreshed by the native listener each time one of those apps posts, so it
+  /// reflects what was seen most recently rather than a live query.
+  Future<List<PopupWarning>> loadPopupWarnings();
+
+  /// Opens the Android page where that app's pop-ups can be turned off.
+  ///
+  /// Samir Lock never changes the setting itself.
+  Future<bool> openChannelSettings({
+    required String packageName,
+    required String channelId,
+  });
 }
 
 /// Raised when the native layer cannot satisfy a security request.

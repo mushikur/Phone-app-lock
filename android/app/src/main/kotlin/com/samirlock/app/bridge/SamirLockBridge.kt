@@ -15,6 +15,8 @@ import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.lock.PinSetupActivity
 import com.samirlock.app.notifications.NotificationPrivacy
 import com.samirlock.app.notifications.NotificationPrivacyState
+import com.samirlock.app.notifications.PopupChannelStore
+import com.samirlock.app.notifications.PopupSettingsLauncher
 import com.samirlock.app.guard.GuardLog
 import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.GuardServiceController
@@ -50,6 +52,7 @@ class SamirLockBridge(
     private val guardPreferences = GuardPreferences(context)
     private val pinVault = PinVault(context)
     private val lockoutStore = LockoutStore(context)
+    private val popupChannels = PopupChannelStore(context)
     private val appContext = context.applicationContext
     private val channel = MethodChannel(messenger, CHANNEL_NAME)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -152,6 +155,31 @@ class SamirLockBridge(
                     fromActivity = host != null,
                 )
                 result.success(opened)
+            }
+
+            METHOD_GET_POPUP_WARNINGS -> result.success(popupWarnings())
+
+            METHOD_OPEN_CHANNEL_SETTINGS -> {
+                val packageName = call.argument<String>(ARG_PACKAGE_NAME)
+                val channelId = call.argument<String>(ARG_CHANNEL_ID).orEmpty()
+                if (packageName.isNullOrEmpty()) {
+                    result.error(
+                        ERROR_INVALID_ARGUMENTS,
+                        "openChannelSettings requires a packageName.",
+                        null,
+                    )
+                    return
+                }
+                // Samir Lock never changes the setting itself; it only opens the
+                // page where the user can.
+                result.success(
+                    PopupSettingsLauncher.open(
+                        context = appContext,
+                        activity = activity,
+                        packageName = packageName,
+                        channelId = channelId,
+                    ),
+                )
             }
 
             METHOD_SET_DIAGNOSTICS -> {
@@ -318,6 +346,28 @@ class SamirLockBridge(
      * PIN exists and whether biometrics are usable. Never the PIN, never the
      * stored record, and nothing that could release a lock.
      */
+    /**
+     * Locked apps whose notification channel can still show a pop-up.
+     *
+     * Only what the settings screen needs to name the app and open the right
+     * page: no notification content is involved.
+     */
+    private fun popupWarnings(): List<Map<String, Any?>> {
+        val locked = lockedAppsStore.lockedPackages()
+        return popupChannels.popupWarnings(locked).map { entry ->
+            mapOf(
+                KEY_PACKAGE_NAME to entry.packageName,
+                KEY_CHANNEL_ID to entry.channelId,
+                KEY_APP_NAME to appLabel(entry.packageName),
+            )
+        }
+    }
+
+    private fun appLabel(packageName: String): String = runCatching {
+        val manager = appContext.packageManager
+        manager.getApplicationLabel(manager.getApplicationInfo(packageName, 0)).toString()
+    }.getOrDefault(packageName)
+
     private fun securityStatus(): Map<String, Any?> = mapOf(
         KEY_HAS_PIN to pinVault.hasPin(),
         KEY_BIOMETRIC to BiometricAuthenticator.availabilityOf(appContext).name,
@@ -389,6 +439,8 @@ class SamirLockBridge(
         const val METHOD_OPEN_PIN_SETUP = "openPinSetup"
         const val METHOD_SET_BIOMETRIC_ENABLED = "setBiometricEnabled"
         const val METHOD_SET_DIAGNOSTICS = "setDiagnosticsEnabled"
+        const val METHOD_GET_POPUP_WARNINGS = "getPopupWarnings"
+        const val METHOD_OPEN_CHANNEL_SETTINGS = "openChannelSettings"
         const val METHOD_SET_NOTIFICATION_PRIVACY = "setNotificationPrivacyEnabled"
         const val METHOD_OPEN_NOTIFICATION_ACCESS = "openNotificationAccess"
 
@@ -396,6 +448,7 @@ class SamirLockBridge(
         const val ARG_LOCKED = "locked"
         const val ARG_PERMISSION = "permission"
         const val ARG_ENABLED = "enabled"
+        const val ARG_CHANNEL_ID = "channelId"
 
         const val KEY_ENABLED = "enabled"
         const val KEY_RUNNING = "running"
@@ -410,6 +463,9 @@ class SamirLockBridge(
         const val KEY_NOTIFICATION_BLOCKER = "notificationPrivacyBlocker"
         const val KEY_NOTIFICATION_DIAGNOSTICS = "notificationPrivacyDiagnostics"
         const val KEY_DIAGNOSTICS_ENABLED = "diagnosticsEnabled"
+        const val KEY_CHANNEL_ID = "channelId"
+        const val KEY_PACKAGE_NAME = "packageName"
+        const val KEY_APP_NAME = "appName"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"

@@ -28,6 +28,7 @@ class SecuritySettingsScreen extends StatelessWidget {
   static const Key notificationPrivacyKey = Key('notification-privacy-switch');
   static const Key notificationAccessKey = Key('notification-access-tile');
   static const Key diagnosticsKey = Key('diagnostics-switch');
+  static const Key popupWarningKey = Key('popup-warning-tile');
 
   Future<void> _setUpPin(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -62,6 +63,19 @@ class SecuritySettingsScreen extends StatelessWidget {
   Future<void> _openNotificationAccess(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final error = await securityController.openNotificationAccess();
+    if (error == null) return;
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error)));
+  }
+
+  Future<void> _openChannelSettings(
+    BuildContext context,
+    PopupWarning warning,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await securityController.openChannelSettings(warning);
     if (error == null) return;
 
     messenger
@@ -249,6 +263,21 @@ class SecuritySettingsScreen extends StatelessWidget {
                 );
               },
             ),
+            ListenableBuilder(
+              listenable: securityController,
+              builder: (context, _) {
+                final warnings = securityController.state.popupWarnings;
+                if (warnings.isEmpty) return const SizedBox.shrink();
+
+                return Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.md),
+                  child: _PopupWarningCard(
+                    warnings: warnings,
+                    onOpen: (warning) => _openChannelSettings(context, warning),
+                  ),
+                );
+              },
+            ),
             const SectionHeader('Permissions'),
             ListenableBuilder(
               listenable: permissionsController,
@@ -314,6 +343,89 @@ class SecuritySettingsScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Names the locked apps that can still show a notification pop-up, and offers
+/// the one thing Samir Lock can legitimately do about it.
+///
+/// The wording is deliberate: Android does not let one app change another app's
+/// notification settings, so this opens the page rather than pretending to fix
+/// it, and it says up front that silencing the channel also removes its sound.
+class _PopupWarningCard extends StatelessWidget {
+  const _PopupWarningCard({required this.warnings, required this.onOpen});
+
+  final List<PopupWarning> warnings;
+  final ValueChanged<PopupWarning> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        color: colorScheme.errorContainer.withValues(alpha: 0.32),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.warning_amber_rounded, color: colorScheme.error),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  warnings.length == 1
+                      ? 'Message pop-ups still show content'
+                      : 'Message pop-ups still show content in '
+                          '${warnings.length} apps',
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Android shows a pop-up before Samir Lock is told a notification '
+            'arrived, so the message can be read for a moment even though the '
+            'notification shade is protected.\n\n'
+            'Samir Lock cannot switch off another app’s pop-ups for you. '
+            'Android does not allow it. You can turn them off yourself in one '
+            'tap, but note that setting a channel to Silent also removes its '
+            'sound and vibration.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          for (final warning in warnings)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonal(
+                  key: warning == warnings.first
+                      ? SecuritySettingsScreen.popupWarningKey
+                      : null,
+                  onPressed: () => onOpen(warning),
+                  child: Text('Disable pop-ups for ${warning.appName}'),
+                ),
+              ),
+            ),
+          Text(
+            'This updates the next time that app sends a notification.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
