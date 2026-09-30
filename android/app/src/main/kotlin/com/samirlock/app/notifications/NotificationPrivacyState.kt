@@ -3,34 +3,54 @@ package com.samirlock.app.notifications
 import android.content.Context
 import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.guard.GuardPreferences
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Why notification hiding is, or is not, doing anything right now.
  *
- * Hiding has four preconditions, and until now every one of them failed in
- * silence: the switch could be on, the service bound, and nothing would happen
- * because protection was off or no app was locked. This turns that into
- * something the app can state plainly.
+ * Hiding has four preconditions and several per-notification reasons to leave
+ * one alone, and every one of them used to fail in silence: the switch could be
+ * on, the service bound, and nothing would happen. Release builds log nothing,
+ * so without this there is no way to tell which. These counters are what the
+ * settings screen reports, and they hold nothing but counts and reason codes —
+ * never a package's notification content.
  */
 object NotificationPrivacyState {
 
-    /** Reasons hiding is inactive, in the order the user should address them. */
+    /** Reasons hiding is inactive overall, in the order the user should act on. */
     enum class Blocker(val wireName: String) {
-        /** Nothing is blocking it; hiding is active. */
         NONE("none"),
-
-        /** Android notification access has not been granted. */
         NO_ACCESS("noAccess"),
-
-        /** The user has not switched the feature on. */
         DISABLED("off"),
-
-        /** App protection is off, so no app is locked to hide anything for. */
         PROTECTION_OFF("protectionOff"),
-
-        /** The feature is on but no apps have been chosen to lock. */
         NO_LOCKED_APPS("noLockedApps"),
     }
+
+    /** Why a particular notification was left alone. */
+    enum class Skip(val wireName: String) {
+        NOT_ACTIVE("notActive"),
+        OWN_APP("ownApp"),
+        NOT_LOCKED("notLocked"),
+        ALREADY_UNLOCKED("alreadyUnlocked"),
+        ONGOING("ongoing"),
+    }
+
+    private val seen = AtomicInteger(0)
+    private val hidden = AtomicInteger(0)
+    private val cancelFailures = AtomicInteger(0)
+
+    @Volatile
+    private var lastSkip: Skip? = null
+
+    fun recordSeen() = seen.incrementAndGet()
+
+    fun recordHidden(count: Int) = hidden.addAndGet(count)
+
+    fun recordSkipped(skip: Skip) {
+        lastSkip = skip
+    }
+
+    fun recordCancelFailed() = cancelFailures.incrementAndGet()
 
     fun blocker(context: Context): Blocker {
         val preferences = GuardPreferences(context)
@@ -45,4 +65,12 @@ object NotificationPrivacyState {
     }
 
     fun isActive(context: Context): Boolean = blocker(context) == Blocker.NONE
+
+    /** Counts and reason codes for the settings screen. Never any content. */
+    fun diagnostics(): Map<String, Any?> = mapOf(
+        "seen" to seen.get(),
+        "hidden" to hidden.get(),
+        "cancelFailures" to cancelFailures.get(),
+        "lastSkip" to (lastSkip?.wireName ?: ""),
+    )
 }

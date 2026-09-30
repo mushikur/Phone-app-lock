@@ -46,6 +46,9 @@ class NativeSecurityRepository implements SecurityRepository {
   }
 
   SecurityStatus _toStatus(Map<String, Object?> raw) {
+    final diagnostics =
+        (raw['notificationPrivacyDiagnostics'] as Map?)?.cast<Object?, Object?>();
+
     return SecurityStatus(
       hasPin: raw['hasPin'] as bool? ?? false,
       biometric: BiometricAvailability.fromWireName(raw['biometric'] as String?),
@@ -59,6 +62,8 @@ class NativeSecurityRepository implements SecurityRepository {
       notificationPrivacyBlocker: NotificationPrivacyBlocker.fromWireName(
         raw['notificationPrivacyBlocker'] as String?,
       ),
+      notificationsSeen: diagnostics?['seen'] as int? ?? 0,
+      notificationsHidden: diagnostics?['hidden'] as int? ?? 0,
     );
   }
 

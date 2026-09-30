@@ -55,6 +55,8 @@ class SecurityStatus {
     required this.isNotificationPrivacyEnabled,
     required this.isNotificationAccessGranted,
     required this.notificationPrivacyBlocker,
+    this.notificationsSeen = 0,
+    this.notificationsHidden = 0,
   });
 
   const SecurityStatus.unknown()
@@ -65,7 +67,9 @@ class SecurityStatus {
         failedAttempts = 0,
         isNotificationPrivacyEnabled = false,
         isNotificationAccessGranted = false,
-        notificationPrivacyBlocker = NotificationPrivacyBlocker.noAccess;
+        notificationPrivacyBlocker = NotificationPrivacyBlocker.noAccess,
+        notificationsSeen = 0,
+        notificationsHidden = 0;
 
   final bool hasPin;
   final BiometricAvailability biometric;
@@ -91,6 +95,14 @@ class SecurityStatus {
 
   /// What is stopping notification hiding from working, if anything.
   final NotificationPrivacyBlocker notificationPrivacyBlocker;
+
+  /// Notifications the listener has been handed since it last started.
+  ///
+  /// Counts only. Nothing about what a notification said reaches this layer.
+  final int notificationsSeen;
+
+  /// Notifications it has actually taken down and replaced.
+  final int notificationsHidden;
 
   /// Notifications from locked apps are actually being hidden right now.
   bool get isNotificationPrivacyActive =>

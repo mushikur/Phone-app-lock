@@ -1,11 +1,11 @@
 package com.samirlock.app.notifications
 
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.samirlock.app.data.LockedAppsStore
 import com.samirlock.app.guard.GuardLog
-import com.samirlock.app.guard.GuardPreferences
 import com.samirlock.app.guard.LockCoordinator
 import java.util.concurrent.ConcurrentHashMap
 
@@ -20,26 +20,19 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * The trade-off is real and worth being clear about: the original notification
  * is gone, not stored. What the user sees after unlocking is whatever the app
- * itself shows. Nothing about the hidden notification is written anywhere.
+ * itself shows. Nothing about the hidden notification is written anywhere, and
+ * nothing from it is ever copied into the stand-in.
  */
 class NotificationPrivacyService : NotificationListenerService() {
 
-    private lateinit var preferences: GuardPreferences
     private lateinit var lockedAppsStore: LockedAppsStore
 
-    /**
-     * How many notifications are currently hidden per package.
-     *
-     * Written from the binder thread that delivers notifications and read from
-     * the main thread when an app is unlocked, so it is concurrent rather than a
-     * plain map.
-     */
+    /** How many notifications are currently hidden per package. */
     private val hiddenCounts = ConcurrentHashMap<String, Int>()
 
     override fun onCreate() {
         super.onCreate()
         GuardLog.configure(this)
-        preferences = GuardPreferences(this)
         lockedAppsStore = LockedAppsStore(this)
         NotificationPrivacy.ensureChannel(this)
     }
@@ -48,6 +41,12 @@ class NotificationPrivacyService : NotificationListenerService() {
         super.onListenerConnected()
         instance = this
         GuardLog.d("privacy: listener connected")
+
+        // Notifications that arrived before this connection are already on
+        // screen showing their content. Without this sweep they stay visible
+        // for as long as the user leaves them there — which is exactly what a
+        // service that restarts after a reboot or an update would leave behind.
+        sweepLockedPackages()
     }
 
     override fun onListenerDisconnected() {
@@ -62,61 +61,129 @@ class NotificationPrivacyService : NotificationListenerService() {
         super.onDestroy()
     }
 
-    override fun onNotificationPosted(sbn: StatusBarNotification?) {
+    /**
+     * The two-argument form is the one the platform actually calls; the
+     * single-argument form only exists because the default implementation of
+     * this one forwards to it. Overriding this directly removes that hop and
+     * any chance of an OEM framework skipping it.
+     */
+    override fun onNotificationPosted(sbn: StatusBarNotification?, rankingMap: RankingMap?) {
         val notification = sbn ?: return
-        if (!shouldHide(notification)) return
+        NotificationPrivacyState.recordSeen()
 
-        val packageName = notification.packageName
-        val count = hiddenCounts.merge(packageName, 1, Int::plus) ?: 1
+        val skip = skipReason(notification)
+        if (skip != null) {
+            NotificationPrivacyState.recordSkipped(skip)
+            return
+        }
 
-        // Take the original down first, so its content is never left on screen.
-        runCatching { cancelNotification(notification.key) }
-            .onFailure {
-                GuardLog.w("privacy: could not take down a notification", it)
-                hiddenCounts.merge(packageName, -1, Int::plus)
-                return
-            }
+        hide(notification.packageName, notification.key, notification.notification?.contentIntent)
+    }
 
+    /**
+     * Takes down everything this package currently has on screen, not just the
+     * one notification that triggered this.
+     *
+     * Messaging apps post a group summary alongside each message, and the
+     * summary carries the same sender and text. Cancelling only the child would
+     * leave the content on display in the summary, which is the whole thing this
+     * feature exists to prevent.
+     */
+    private fun hide(packageName: String, key: String?, contentIntent: PendingIntent?) {
+        var cancelled = 0
+        var tapAction = contentIntent
+
+        if (key != null && cancel(key)) cancelled++
+
+        for (active in activeFor(packageName)) {
+            if (active.key == key) continue
+            if (!isHideable(active)) continue
+            if (tapAction == null) tapAction = active.notification?.contentIntent
+            if (cancel(active.key)) cancelled++
+        }
+
+        if (cancelled == 0) {
+            // Nothing came down, so posting a stand-in would only add noise on
+            // top of content that is still showing.
+            NotificationPrivacyState.recordCancelFailed()
+            GuardLog.w("privacy: could not take down notifications from $packageName")
+            return
+        }
+
+        val count = hiddenCounts.merge(packageName, cancelled, Int::plus) ?: cancelled
+        postPlaceholder(packageName, count, tapAction)
+        NotificationPrivacyState.recordHidden(cancelled)
+
+        // The package name only. What the notification said is never logged.
+        GuardLog.d("privacy: hid $cancelled from $packageName (now $count)")
+    }
+
+    private fun postPlaceholder(packageName: String, count: Int, tapAction: PendingIntent?) {
         val placeholder = NotificationPrivacy.buildPlaceholder(
             context = this,
             appName = appLabel(packageName),
             count = count,
-            originalIntent = notification.notification?.contentIntent,
+            originalIntent = tapAction,
         )
 
         val manager = getSystemService(NotificationManager::class.java)
         runCatching {
             manager?.notify(NotificationPrivacy.notificationIdFor(packageName), placeholder)
         }.onFailure { GuardLog.w("privacy: could not post the stand-in", it) }
-
-        // Deliberately logs the package only. What the notification said is
-        // never read into a log, a file or anywhere else.
-        GuardLog.d("privacy: hid a notification from $packageName (now $count)")
     }
 
+    /** Hides anything already on screen for apps that are locked right now. */
+    private fun sweepLockedPackages() {
+        if (!NotificationPrivacyState.isActive(this)) return
+
+        val locked = lockedAppsStore.lockedPackages()
+        for (packageName in locked) {
+            if (LockCoordinator.isUnlocked(packageName)) continue
+            val active = activeFor(packageName).filter(::isHideable)
+            if (active.isEmpty()) continue
+            hide(packageName, null, active.first().notification?.contentIntent)
+        }
+    }
+
+    private fun activeFor(packageName: String): List<StatusBarNotification> =
+        runCatching { activeNotifications }
+            .getOrNull()
+            .orEmpty()
+            .filter { it.packageName == packageName }
+
+    private fun cancel(key: String): Boolean =
+        runCatching { cancelNotification(key) }.isSuccess
+
     /**
-     * Only notifications from an app that is locked right now, and only when the
-     * user asked for this.
+     * Why this notification is being left alone, or null when it should be hidden.
      */
-    private fun shouldHide(sbn: StatusBarNotification): Boolean {
+    private fun skipReason(sbn: StatusBarNotification): NotificationPrivacyState.Skip? {
         // One source of truth with the settings screen: whatever it tells the
         // user is blocking hiding is exactly what is checked here.
-        if (!NotificationPrivacyState.isActive(this)) return false
+        if (!NotificationPrivacyState.isActive(this)) {
+            return NotificationPrivacyState.Skip.NOT_ACTIVE
+        }
 
-        val packageName = sbn.packageName ?: return false
-        if (packageName == this.packageName) return false
-        if (packageName !in lockedAppsStore.lockedPackages()) return false
+        val packageName = sbn.packageName ?: return NotificationPrivacyState.Skip.NOT_ACTIVE
+        if (packageName == this.packageName) return NotificationPrivacyState.Skip.OWN_APP
+        if (packageName !in lockedAppsStore.lockedPackages()) {
+            return NotificationPrivacyState.Skip.NOT_LOCKED
+        }
 
         // An app the user has just unlocked is not hidden; they are looking at it.
-        if (LockCoordinator.isUnlocked(packageName)) return false
+        if (LockCoordinator.isUnlocked(packageName)) {
+            return NotificationPrivacyState.Skip.ALREADY_UNLOCKED
+        }
 
         // Ongoing notifications are things like a music player or a call. Taking
         // those down would break the app rather than protect the user.
-        if (sbn.isOngoing) return false
-        if (!sbn.isClearable) return false
+        if (!isHideable(sbn)) return NotificationPrivacyState.Skip.ONGOING
 
-        return true
+        return null
     }
+
+    private fun isHideable(sbn: StatusBarNotification): Boolean =
+        !sbn.isOngoing && sbn.isClearable
 
     private fun appLabel(packageName: String): String = runCatching {
         val info = packageManager.getApplicationInfo(packageName, 0)

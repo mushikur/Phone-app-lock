@@ -314,6 +314,9 @@ class SamirLockBridge(
         // Why hiding is or is not doing anything, so the screen can say so
         // instead of showing a switch that appears on and does nothing.
         KEY_NOTIFICATION_BLOCKER to NotificationPrivacyState.blocker(appContext).wireName,
+        // Counts and reason codes only, so the settings screen can report what
+        // the listener is actually doing on a build that logs nothing.
+        KEY_NOTIFICATION_DIAGNOSTICS to NotificationPrivacyState.diagnostics(),
     )
 
     private fun setProtectionEnabled(enabled: Boolean): Map<String, Any?> {
@@ -386,6 +389,7 @@ class SamirLockBridge(
         const val KEY_NOTIFICATION_PRIVACY = "notificationPrivacyEnabled"
         const val KEY_NOTIFICATION_ACCESS = "notificationAccessGranted"
         const val KEY_NOTIFICATION_BLOCKER = "notificationPrivacyBlocker"
+        const val KEY_NOTIFICATION_DIAGNOSTICS = "notificationPrivacyDiagnostics"
 
         const val ERROR_INVALID_ARGUMENTS = "invalid_arguments"
         const val ERROR_NATIVE_FAILURE = "native_failure"

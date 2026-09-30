@@ -193,9 +193,16 @@ class SecuritySettingsScreen extends StatelessWidget {
                       // Says which precondition is unmet rather than showing a
                       // switch that looks on and quietly does nothing.
                       subtitle: switch (status.notificationPrivacyBlocker) {
-                        NotificationPrivacyBlocker.none =>
-                          'Active. Notifications from locked apps show only the '
-                              'app name until you unlock them.',
+                        NotificationPrivacyBlocker.none => switch (status) {
+                          _ when status.notificationsHidden > 0 =>
+                            'Active. ${status.notificationsHidden} hidden so far.',
+                          _ when status.notificationsSeen > 0 =>
+                            'Active, but nothing has matched yet. Only locked '
+                                'apps you are not currently in are hidden.',
+                          _ =>
+                            'Active. Notifications from locked apps will show '
+                                'only the app name until you unlock them.',
+                        },
                         NotificationPrivacyBlocker.noAccess =>
                           'Needs notification access before it can work.',
                         NotificationPrivacyBlocker.off =>
